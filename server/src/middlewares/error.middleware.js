@@ -1,10 +1,13 @@
-export const errorHandler = (err, req, res, next) => {
-    const statusCode = err.statusCode || 500;
+import { env } from "../config/env.js";
+import { HTTP_STATUS } from "../shared/constants/httpStatus.js";
 
-    res.status(statusCode).json({
+export const errorHandler = (err, req, res, next) => {
+    const statusCode = err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
+
+    return res.status(statusCode).json({
         success: false,
         message: err.message || "Internal Server Error",
-        error: process.env.NODE_ENV === "development" ? err.stack : undefined,
+        error: env.NODE_ENV === "development" ? err.stack : undefined,
 
     })
 }
