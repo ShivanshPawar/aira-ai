@@ -12,7 +12,8 @@ import routes from "./routes/index.js";
 import { globalRateLimiter } from "./middlewares/rateLimiter.middleware.js";
 import { notFound } from "./middlewares/notFound.middleware.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
-
+import authRoutes from "./modules/auth/auth.routes.js";
+import userRoutes from "./modules/users/user.routes.js";
 
 
 const app = express();
@@ -40,6 +41,10 @@ app.use(globalRateLimiter);
 // Routes
 
 app.use("/api/v1", routes);
+
+app.use("/api/v1/auth",authRoutes)
+
+app.use("/api/v1/users", userRoutes);
 
 // Error Handling
 
