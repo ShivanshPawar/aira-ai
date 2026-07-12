@@ -2,7 +2,7 @@ import { authRepository } from "./auth.repository.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { AUTH } from "../../shared/constants/auth.js";
-import { generateAccessToken, generateRefreshToken } from "../../shared/utils/jwt.js";
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../shared/utils/jwt.js";
 import { hashToken } from "../../shared/utils/crypto.js";
 
 
@@ -80,8 +80,64 @@ const login = async (credentials, context) => {
     return createAuthResponse(user, context);
 };
 
+const validateRefreshSession = async (refreshToken) => {
+
+    if (!refreshToken) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Refresh token is missing");
+    }
+
+    const decoded = verifyRefreshToken(refreshToken);
+
+    const hashedToken = hashToken(refreshToken);
+
+    const session = await authRepository.findSessionByToken(hashedToken);
+
+    if (!session) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid session");
+    }
+
+    const user = await authRepository.findUserById(decoded.sub);
+
+    if (!user) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "User not found");
+    }
+
+    return {
+        user,
+        session,
+    };
+}
+
+const refresh = async (refreshToken) => {
+
+    const { user } = await validateRefreshSession(refreshToken);
+
+    const accessToken = generateAccessToken({
+        sub: user._id.toString(),
+        role: user.role,
+    });
+
+    return {
+        accessToken,
+    }
+
+}
+
+const logout = async (refreshToken) => {
+
+    const { session } = await validateRefreshSession(refreshToken);
+
+    await authRepository.revokeSession(session._id);
+
+    return {
+        message: "User logged out successfully"
+    }
+}
+
 
 export const authService = {
     register,
     login,
+    refresh,
+    logout,
 }

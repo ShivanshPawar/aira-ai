@@ -34,9 +34,8 @@ export const authRepository = {
     async revokeSession(sessionId) {
         return Session.findByIdAndUpdate(
             sessionId,
-            {
-                isRevoked: true,
-            }
+            { isRevoked: true },
+            { new: true }
         );
     }
 
