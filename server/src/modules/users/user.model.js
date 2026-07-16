@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 
-import { ROLES } from "../shared/constants/roles.js";
-import { AUTH_PROVIDERS } from "../shared/constants/authProviders.js";
+import { ROLES } from "../../shared/constants/roles.js";
+import { AUTH_PROVIDERS } from "../../shared/constants/authProviders.js";
 import { lowercase } from "zod";
 
 const avatarSchema = new mongoose.Schema({

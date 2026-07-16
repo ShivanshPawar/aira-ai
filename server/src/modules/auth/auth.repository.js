@@ -1,5 +1,5 @@
-import { User } from "../../models/user.model.js";
-import { Session } from '../../models/session.model.js';
+import { User } from "../users/user.model.js";
+import { Session } from './session.model.js';
 
 export const authRepository = {
     async createUser(userData) {

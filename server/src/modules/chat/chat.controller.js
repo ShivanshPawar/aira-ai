@@ -1,0 +1,79 @@
+
+import { HTTP_STATUS } from '../../shared/constants/httpStatus.js';
+import { ApiResponse } from '../../shared/responses/ApiResponse.js';
+import { asyncHandler } from './../../shared/utils/asyncHandler.js';
+import { chatService } from './chat.service.js';
+
+export const createChat = asyncHandler(async (req, res) => {
+
+    const chat = await chatService.createChat(
+        req.auth.userId,
+        req.body
+    )
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.CREATED,
+        "Chat created successfully",
+        chat
+    );
+
+});
+
+export const getChats = asyncHandler(async (req, res) => {
+
+    const chats = await chatService.getChats(req.auth.userId);
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Chats fetched successfully",
+        chats
+    );
+});
+
+export const getChatById = asyncHandler(async (req, res) => {
+
+    const chat = await chatService.getChatById(
+        req.params.chatId,
+        req.auth.userId
+    );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Chat fetched successfully",
+        chat
+    )
+});
+
+export const updateChat = asyncHandler(async (req, res) => {
+
+    const chat = await chatService.updateChat(
+        req.params.chatId,
+        req.auth.userId,
+        req.body
+    );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Chat updated successfully",
+        chat
+    )
+})
+
+export const deleteChat = asyncHandler(async (req, res) => {
+
+    const chat = await chatService.deleteChat(
+        req.params.chatId,
+        req.auth.userId
+    );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Chat deleted successfully",
+        chat
+    )
+})
