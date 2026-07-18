@@ -1,5 +1,7 @@
 import { chatRepository } from "./chat.repository.js";
 import { AI_MODELS, AI_PROVIDERS } from "./../../shared/constants/ai.js";
+import { ApiError } from "../../shared/errors/ApiError.js";
+import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 
 const createChat = async (userId, data) => {
 
@@ -24,17 +26,7 @@ const getChats = async (userId) => {
 };
 
 const getChatById = async (chatId, userId) => {
-    const chat = await chatRepository.findById(chatId);
-
-    if (!chat) {
-        throw new ApiError(HTTP_STATUS.NOT_FOUND, "Chat not found");
-    }
-
-    if (chat.user.toString() !== userId.toString()) {
-        throw new ApiError(HTTP_STATUS.FORBIDDEN, "You don't have access to this chat");
-    }
-
-    return chat
+    return verifyChatAccess(chatId, userId);
 }
 
 const updateChat = async (
@@ -43,7 +35,7 @@ const updateChat = async (
     updateData
 ) => {
 
-    await getChatById(chatId, userId);
+    await verifyChatAccess(chatId, userId);
 
     return chatRepository.updateById(
         chatId,
@@ -59,10 +51,37 @@ const deleteChat = async (chatId, userId) => {
     return chatRepository.deleteById(chatId);
 }
 
+const verifyChatAccess = async (chatId, userId) => {
+
+    const chat = await chatRepository.findById(chatId);
+
+    if (!chat) {
+        throw new ApiError(
+            HTTP_STATUS.NOT_FOUND,
+            "Chat not found."
+        );
+    }
+
+    if (chat.user.toString() !== userId.toString()) {
+        throw new ApiError(
+            HTTP_STATUS.FORBIDDEN,
+            "You don't have access to this chat."
+        );
+    }
+
+    return chat;
+};
+
+const updateChatActivity = async (chatId, messageId) => {
+    return chatRepository.updateChatActivity(chatId, messageId);
+};
+
 export const chatService = {
     createChat,
     getChats,
     getChatById,
     updateChat,
     deleteChat,
+    verifyChatAccess,
+    updateChatActivity,
 }

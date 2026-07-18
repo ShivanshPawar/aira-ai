@@ -1,0 +1,11 @@
+export const MESSAGE_ROLES = {
+    USER: "USER",
+    ASSISTANT: "ASSISTANT",
+    SYSTEM: "SYSTEM",
+};
+
+export const MESSAGE_STATUS = {
+    PENDING: "PENDING",
+    COMPLETED: "COMPLETED",
+    FAILED: "FAILED",
+};

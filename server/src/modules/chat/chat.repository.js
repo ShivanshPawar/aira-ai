@@ -32,10 +32,27 @@ const deleteById = async (chatId) => {
     return Chat.findByIdAndDelete(chatId);
 };
 
+const updateChatActivity = async (chatId, lastMessageId) => {
+    return Chat.findByIdAndUpdate(
+        chatId,
+        {
+            lastMessage: lastMessageId,
+            lastMessageAt: new Date(),
+            $inc: {
+                messageCount: 1,
+            },
+        },
+        {
+            new: true,
+        }
+    );
+};
+
 export const chatRepository = {
     create,
     findById,
     findByUser,
     updateById,
-    deleteById
+    deleteById,
+    updateChatActivity,
 };

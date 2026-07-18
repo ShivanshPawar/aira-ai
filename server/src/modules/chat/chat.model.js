@@ -49,6 +49,18 @@ const chatSchema = new mongoose.Schema({
         index: true
     },
 
+    lastMessage:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Message",
+        default: null,
+    },
+
+    messageCount:{
+        type: Number,
+        default: 0
+    }
+    
+
 }, {
     timestamps: true,
     versionKey: false,
