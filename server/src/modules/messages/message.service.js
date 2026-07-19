@@ -3,6 +3,10 @@ import { messageRepository } from "./message.repository.js";
 import { MESSAGE_ROLES } from "../../shared/constants/message.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
+import { aiService } from "../ai/ai.service.js";
+// import { chatService } from './../chat/chat.service.js';
+import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
+import { buildConversationPrompt } from "../ai/prompt.builder.js";
 
 const sendUserMessage = async (
     userId,
@@ -12,17 +16,40 @@ const sendUserMessage = async (
 
     await chatService.verifyChatAccess(chatId, userId);
 
-    const message = await messageRepository.createMessage({
+    const userMessage = await messageRepository.createMessage({
         chat: chatId,
         user: userId,
         content,
         role: MESSAGE_ROLES.USER
     });
 
-    await chatService.updateChatActivity(chatId, message._id);
+    const history = await messageRepository.findMessagesByChat(chatId)
 
-    return message;
+    const prompt = buildConversationPrompt(history);
+
+    const aiResponse = await aiService.generateResponse(prompt)
+
+    const assistantMessage = await messageRepository.createMessage({
+        chat: chatId,
+        user: userId,
+        role: MESSAGE_ROLES.ASSISTANT,
+        content: aiResponse.content,
+        provider: DEFAULT_PROVIDER,
+        model: DEFAULT_MODEL,
+        tokenUsage: aiResponse.usage,
+        metadata: {
+            finishReason: aiResponse.finishReason,
+        },
+    });
+
+    await chatService.updateChatActivity(chatId, assistantMessage._id);
+
+    return {
+        userMessage,
+        assistantMessage
+    }
 }
+
 
 const getMessagesbyChat = async (userId, chatId) => {
 
