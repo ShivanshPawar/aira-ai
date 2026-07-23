@@ -24,12 +24,12 @@ const app = express();
 app.use(helmet());
 
 app.use(cors({
-    origin: env.CLIENT_URL,
-    credentials: true,
-})
-);
+  origin: 'http://127.0.0.1:5500', // Allow your frontend origin
+  methods: ['POST', 'OPTIONS'],    // Allow necessary methods
+  allowedHeaders: ['Content-Type', 'Authorization'] // Allow your custom headers
+}));
 
-app.use(compression());
+// app.use(compression());
 
 app.use(morgen("dev"));
 

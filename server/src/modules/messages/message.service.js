@@ -51,6 +51,92 @@ const sendUserMessage = async (
 }
 
 
+const streamMessage = async (
+    userId,
+    chatId,
+    content,
+    callbacks = {}
+) => {
+
+    const {
+        onToken = (text) => { },
+        onComplete = ({ assistantMessage }) => { },
+        onError = (error) => { },
+    } = callbacks;
+
+    try {
+
+        await chatService.verifyChatAccess(chatId, userId);
+
+        await messageRepository.createMessage({
+            chat: chatId,
+            user: userId,
+            role: MESSAGE_ROLES.USER,
+            content,
+        });
+
+        const history = await messageRepository.findMessagesByChat(chatId);
+
+        const prompt = buildConversationPrompt(history);
+
+        const stream = await aiService.generateStream(prompt);
+
+        let assistantText = "";
+
+        let finishReason = null;
+
+        let usage = null;
+
+        for await (const chunk of stream) {
+
+            const text = chunk.text || "";
+
+            if (!text) continue;
+
+            assistantText += text;
+
+            onToken(text);
+
+            finishReason = chunk.candidates?.[0]?.finishReason ?? finishReason;
+
+            usage = chunk.usageMetadata ?? usage;
+        }
+
+        const assistantMessage = await messageRepository.createMessage({
+            chat: chatId,
+            user: userId,
+            role: MESSAGE_ROLES.ASSISTANT,
+
+            content: assistantText,
+
+            provider: DEFAULT_PROVIDER,
+            model: DEFAULT_MODEL,
+
+            tokenUsage: {
+                promptTokens: usage?.promptTokens ?? 0,
+                completionTokens: usage?.completionTokens ?? 0,
+                totalTokens: usage?.totalTokens ?? 0,
+            },
+
+            metadata: {
+                finishReason,
+            },
+        });
+
+        await chatService.updateChatActivity(chatId, assistantMessage._id);
+
+        await onComplete({ assistantMessage });
+
+        return assistantMessage;
+
+    } catch (error) {
+        await onError(error);
+        throw error;
+    }
+
+}
+
+
 const getMessagesbyChat = async (userId, chatId) => {
 
     await chatService.verifyChatAccess(chatId, userId);
@@ -78,6 +164,7 @@ const deleteMessage = async (userId, messageId) => {
 
 export const messageService = {
     sendUserMessage,
+    streamMessage,
     getMessagesbyChat,
     getMessageById,
     deleteMessage,

@@ -9,7 +9,7 @@ const generateResponse = async (
     messages,
     options = {}
 ) => {
-    
+
     const model = options.model || "gemini-2.5-flash";
 
     const contents = messages.map((message) => ({
@@ -48,6 +48,34 @@ const generateResponse = async (
 
 };
 
+const generateStream = async (
+    messages,
+    options = {}
+) => {
+
+    const model = options.model || "gemini-2.5-flash";
+
+    const contents = messages.map((message) => ({
+        role: message.role,
+        parts: [
+            {
+                text: message.content,
+            },
+        ],
+    }));
+
+
+    const stream = await client.models.generateContentStream({
+        model,
+        contents,
+    });
+
+    return stream;
+};
+
+
+
 export const geminiProvider = {
     generateResponse,
+    generateStream
 }

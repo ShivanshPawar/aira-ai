@@ -1,5 +1,6 @@
 import { aiFactory } from "./ai.factory.js";
 import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "./ai.constants.js";
+import { geminiProvider } from "./providers/gemini.provider.js";
 
 const generateResponse = async (
     messages,
@@ -15,6 +16,18 @@ const generateResponse = async (
     });
 };
 
+const generateStream = async (
+    messages,
+    options = {}
+) => {
+
+    return geminiProvider.generateStream(
+        messages,
+        options
+    );
+};
+
 export const aiService = {
     generateResponse,
+    generateStream,
 }

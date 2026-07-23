@@ -17,7 +17,7 @@ const updateMessage = async (messageId, data) => {
         messageId,
         data,
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true,
         }
     );
@@ -27,20 +27,7 @@ const deleteMessage = async (messageId) => {
     return Message.findByIdAndDelete(messageId);
 };
 
-const updateChatActivity = async (chatId, lastMessageId) => {
-    return Chat.findByIdAndUpdate(
-        chatId,
-        {
-            lastMessageAt: lastMessageId,
-            lastMessageAt: new Date(),
-            $inc: {
-                messageCount: 1,
-            },
-        }, {
-        new: true,
-    }
-    );
-};
+
 
 export const messageRepository = {
     createMessage,
@@ -48,5 +35,4 @@ export const messageRepository = {
     findMessagesByChat,
     updateMessage,
     deleteMessage,
-    updateChatActivity
 };
