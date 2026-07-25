@@ -63,6 +63,22 @@ export const updateChat = asyncHandler(async (req, res) => {
     )
 })
 
+export const renameChat = asyncHandler(async (req, res) => {
+
+    const chat = await chatService.renameChat(
+        req.params.chatId,
+        req.auth.userId,
+        req.body.title
+    );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Chat renamed successfully",
+        chat
+    )
+})
+
 export const deleteChat = asyncHandler(async (req, res) => {
 
     const chat = await chatService.deleteChat(

@@ -30,20 +30,26 @@ const getChatById = async (chatId, userId) => {
     return verifyChatAccess(chatId, userId);
 }
 
-const updateChat = async (
-    chatId,
-    userId,
-    updateData
-) => {
+
+const updateChat = async (chatId, userId, updates) => {
 
     await verifyChatAccess(chatId, userId);
 
-    return chatRepository.updateById(
+    const updatedChat = await chatRepository.updateById(
         chatId,
-        updateData
-    )
+        updates
+    );
 
-};
+    if (!updatedChat) {
+        throw new ApiError(
+            HTTP_STATUS.NOT_FOUND,
+            "Chat not found."
+        );
+    }
+
+    return updatedChat;
+
+}
 
 const deleteChat = async (chatId, userId) => {
 
@@ -93,13 +99,20 @@ const updateChatTitle = async (chatId, firstMessage) => {
 
 }
 
+const renameChat = async (chatId, userId, title) => {
+
+    return updateChat(chatId, userId, { title });
+
+}
+
 export const chatService = {
     createChat,
     getChats,
     getChatById,
-    updateChat,
-    deleteChat,
     verifyChatAccess,
     updateChatActivity,
     updateChatTitle,
+    updateChat,
+    deleteChat,
+    renameChat,
 }
