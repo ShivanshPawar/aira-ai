@@ -49,17 +49,17 @@ const chatSchema = new mongoose.Schema({
         index: true
     },
 
-    lastMessage:{
+    lastMessage: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Message",
         default: null,
     },
 
-    messageCount:{
+    messageCount: {
         type: Number,
         default: 0
     }
-    
+
 
 }, {
     timestamps: true,

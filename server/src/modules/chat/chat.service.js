@@ -2,6 +2,7 @@ import { chatRepository } from "./chat.repository.js";
 import { AI_MODELS, AI_PROVIDERS } from "./../../shared/constants/ai.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
+import { generateChatTitle } from "../../shared/utils/titleGenerator.js";
 
 const createChat = async (userId, data) => {
 
@@ -76,6 +77,22 @@ const updateChatActivity = async (chatId, messageId) => {
     return chatRepository.updateChatActivity(chatId, messageId);
 };
 
+const updateChatTitle = async (chatId, firstMessage) => {
+
+    const chat = await chatRepository.findById(chatId);
+
+    if (!chat) return;
+
+    if (chat.title !== "Untitled") {
+        return;
+    }
+
+    const title = generateChatTitle(firstMessage);
+
+    await chatRepository.updateById(chatId, { title });
+
+}
+
 export const chatService = {
     createChat,
     getChats,
@@ -84,4 +101,5 @@ export const chatService = {
     deleteChat,
     verifyChatAccess,
     updateChatActivity,
+    updateChatTitle,
 }

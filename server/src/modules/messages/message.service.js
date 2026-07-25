@@ -4,7 +4,6 @@ import { MESSAGE_ROLES } from "../../shared/constants/message.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { aiService } from "../ai/ai.service.js";
-// import { chatService } from './../chat/chat.service.js';
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
 import { buildConversationPrompt } from "../ai/prompt.builder.js";
 
@@ -43,6 +42,8 @@ const sendUserMessage = async (
     });
 
     await chatService.updateChatActivity(chatId, assistantMessage._id);
+
+    await chatService.updateChatTitle(chatId, content);
 
     return {
         userMessage,
@@ -124,6 +125,8 @@ const streamMessage = async (
         });
 
         await chatService.updateChatActivity(chatId, assistantMessage._id);
+
+        await chatService.updateChatTitle(chatId, content);
 
         await onComplete({ assistantMessage });
 
