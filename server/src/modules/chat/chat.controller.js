@@ -79,6 +79,21 @@ export const renameChat = asyncHandler(async (req, res) => {
     )
 })
 
+export const togglePin = asyncHandler(async (req, res) => {
+
+    const chat = await chatService.togglePin(
+        req.params.chatId,
+        req.auth.userId
+    );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        chat.isPinned ? "Chat pinned successfully" : "Chat unpinned successfully",
+        chat
+    )
+})
+
 export const deleteChat = asyncHandler(async (req, res) => {
 
     const chat = await chatService.deleteChat(

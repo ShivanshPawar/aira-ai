@@ -105,6 +105,16 @@ const renameChat = async (chatId, userId, title) => {
 
 }
 
+const togglePin = async (chatId, userId) => {
+
+    const chat = await verifyChatAccess(chatId, userId);
+
+    return updateChat(chatId, userId, {
+        isPinned: !chat.isPinned
+    });
+
+}
+
 export const chatService = {
     createChat,
     getChats,
@@ -115,4 +125,5 @@ export const chatService = {
     updateChat,
     deleteChat,
     renameChat,
+    togglePin,
 }
