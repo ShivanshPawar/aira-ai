@@ -115,6 +115,14 @@ const togglePin = async (chatId, userId) => {
 
 }
 
+const toggleArchive = async (chatId, userId) => {
+    const chat = await verifyChatAccess(chatId, userId);
+
+    return updateChat(chatId, userId, {
+        isArchived: !chat.isArchived,
+    })
+}
+
 export const chatService = {
     createChat,
     getChats,
@@ -126,4 +134,5 @@ export const chatService = {
     deleteChat,
     renameChat,
     togglePin,
+    toggleArchive,
 }

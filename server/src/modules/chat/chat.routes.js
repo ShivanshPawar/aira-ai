@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createChat, getChats, updateChat, deleteChat, renameChat, togglePin } from "./chat.controller.js";
+import { createChat, getChats, updateChat, deleteChat, renameChat, togglePin, toggleArchive } from "./chat.controller.js";
 import { updateChatSchema, updateChatTitleSchema } from "./chat.validator.js";
 import { protect } from './../../middlewares/auth.middleware.js';
 import { validate } from './../../middlewares/validation.middleware.js';
@@ -21,6 +21,8 @@ router.patch("/:chatId", validate(updateChatSchema), updateChat);
 router.patch("/:chatId/rename", validate(updateChatTitleSchema), renameChat)
 
 router.patch("/:chatId/pin", togglePin);
+
+router.patch("/:chatId/archive", toggleArchive)
 
 router.delete("/:chatId", deleteChat);
 

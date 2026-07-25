@@ -94,6 +94,21 @@ export const togglePin = asyncHandler(async (req, res) => {
     )
 })
 
+export const toggleArchive = asyncHandler(async (req, res) => {
+
+    const chat = await chatService.toggleArchive(
+        req.params.chatId,
+        req.auth.userId
+    );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        chat.isArchived ? "Chat archived successfully" : "Chat unarchived successfully",
+        chat
+    )
+});
+
 export const deleteChat = asyncHandler(async (req, res) => {
 
     const chat = await chatService.deleteChat(
