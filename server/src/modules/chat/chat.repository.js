@@ -8,15 +8,23 @@ const findById = async (chatId) => {
     return Chat.findById(chatId);
 };
 
-const findChats = async (
+const findChats = async ({
     filters,
-    sort = {
-        isPinned: -1,
-        lastMessageAt: -1,
-    }
-) => {
-    return Chat.find(filters).sort(sort);
+    sort,
+    skip,
+    limit,
+}) => {
+
+    return Chat.find(filters)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit);
+
 };
+
+const countChats = async(filters) => {
+    return Chat.countDocuments(filters);
+}
 
 const updateById = async (chatId, data) => {
     return Chat.findByIdAndUpdate(
@@ -53,6 +61,7 @@ export const chatRepository = {
     create,
     findById,
     findChats,
+    countChats,
     updateById,
     deleteById,
     updateChatActivity,

@@ -2,6 +2,15 @@ export class QueryBuilder {
     constructor(query = {}) {
         this.query = query;
         this.filters = {};
+
+        this.page = 1;
+        this.limit = 20;
+        this.skip = 0;
+
+        this.sortOptions = {
+            isPinned: -1,
+            lastMessageAt: -1,
+        }
     }
 
     search(field = "title") {
@@ -32,7 +41,37 @@ export class QueryBuilder {
         return this;
     }
 
+    paginate() {
+        this.page = Math.max(
+            parseInt(this.query.page) || 1,
+            1
+        );
+
+        this.limit = Math.max(
+            parseInt(this.query.limit) || 20,
+            1
+        );
+
+        this.skip = (this.page - 1) * this.limit;
+
+        return this;
+    }
+
+    sort(defaultSort = {
+        isPinned: -1,
+        lastMessageAt: -1,
+    }) {
+        this.sortOptions = defaultSort;
+        return this;
+    }
+
     build() {
-        return this.filters;
+        return {
+            filters: this.filters,
+            page: this.page,
+            limit: this.limit,
+            skip: this.skip,
+            sort: this.sortOptions
+        };
     }
 }

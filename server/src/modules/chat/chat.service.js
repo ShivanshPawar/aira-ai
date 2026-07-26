@@ -28,19 +28,41 @@ const getChats = async (
     query = {}
 ) => {
 
-    const filters = new QueryBuilder(query)
+    const builder = new QueryBuilder(query)
         .search()
         .filter("provider")
         .filter("model")
         .filter("isPinned")
+        .paginate()
+        .sort()
         .build();
 
-    filters.user = userId;
-    filters.isArchived = false;
+    builder.filters.user = userId;
+    builder.filters.isArchived = false;
 
-    console.log(filters);
+    const [items, totalItems] = await Promise.all([
+        chatRepository.findChats(builder),
+        chatRepository.countChats(builder.filters),
+    ])
 
-    return chatRepository.findChats(filters);
+    return {
+        items,
+        pagination: {
+            page: builder.page,
+            limit: builder.limit,
+
+            totalItems,
+
+            totalPages: Math.ceil(
+                totalItems / builder.limit
+            ),
+
+            hasNextPage: builder.page * builder.limit < totalItems,
+
+            hasPreviousPage: builder.page > 1,
+
+        },
+    };
 };
 
 const getChatById = async (chatId, userId) => {
