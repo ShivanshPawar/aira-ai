@@ -35,6 +35,22 @@ export const getChats = asyncHandler(async (req, res) => {
     );
 });
 
+export const getArchivedChats = asyncHandler(async (req, res) => {
+
+    const chats = await chatService.getArchivedChats(
+        req.auth.userId,
+        req.query
+    );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Archived chats fetched successfully",
+        chats
+    );
+
+})
+
 export const getChatById = asyncHandler(async (req, res) => {
 
     const chat = await chatService.getChatById(

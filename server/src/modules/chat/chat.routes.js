@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createChat, getChats, updateChat, deleteChat, renameChat, togglePin, toggleArchive } from "./chat.controller.js";
+import { createChat, getChats, updateChat, deleteChat, renameChat, togglePin, toggleArchive, getArchivedChats } from "./chat.controller.js";
 import { updateChatSchema, updateChatTitleSchema } from "./chat.validator.js";
 import { protect } from './../../middlewares/auth.middleware.js';
 import { validate } from './../../middlewares/validation.middleware.js';
@@ -13,6 +13,8 @@ router.use(protect);
 router.post("/", validate(createChatSchema), createChat)
 
 router.get("/", getChats);
+
+router.get("/archived", getArchivedChats)
 
 router.get("/:chatId", getChatById)
 

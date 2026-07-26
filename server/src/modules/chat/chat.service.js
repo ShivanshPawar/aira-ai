@@ -23,9 +23,10 @@ const createChat = async (userId, data) => {
 
 };
 
-const getChats = async (
+const getChatsWithArchiveStatus = async (
     userId,
-    query = {}
+    query = {},
+    isArchived = false
 ) => {
 
     const builder = new QueryBuilder(query)
@@ -38,31 +39,40 @@ const getChats = async (
         .build();
 
     builder.filters.user = userId;
-    builder.filters.isArchived = false;
+    builder.filters.isArchived = isArchived;
 
     const [items, totalItems] = await Promise.all([
         chatRepository.findChats(builder),
         chatRepository.countChats(builder.filters),
-    ])
+    ]);
 
     return {
         items,
         pagination: {
             page: builder.page,
             limit: builder.limit,
-
             totalItems,
-
-            totalPages: Math.ceil(
-                totalItems / builder.limit
-            ),
-
+            totalPages: Math.ceil(totalItems / builder.limit),
             hasNextPage: builder.page * builder.limit < totalItems,
-
             hasPreviousPage: builder.page > 1,
-
         },
     };
+};
+
+const getChats = (userId, query) => {
+    return getChatsWithArchiveStatus(
+        userId,
+        query,
+        false
+    );
+};
+
+const getArchivedChats = (userId, query) => {
+    return getChatsWithArchiveStatus(
+        userId,
+        query,
+        true
+    );
 };
 
 const getChatById = async (chatId, userId) => {
@@ -165,6 +175,7 @@ const toggleArchive = async (chatId, userId) => {
 export const chatService = {
     createChat,
     getChats,
+    getArchivedChats,
     getChatById,
     updateChat,
     deleteChat,
