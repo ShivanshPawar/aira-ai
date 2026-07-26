@@ -3,6 +3,7 @@ import { AI_MODELS, AI_PROVIDERS } from "./../../shared/constants/ai.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { generateChatTitle } from "../../shared/utils/titleGenerator.js";
+import { QueryBuilder } from "../../shared/utils/queryBuilder.js";
 
 const createChat = async (userId, data) => {
 
@@ -22,8 +23,24 @@ const createChat = async (userId, data) => {
 
 };
 
-const getChats = async (userId) => {
-    return chatRepository.findByUser(userId);
+const getChats = async (
+    userId,
+    query = {}
+) => {
+
+    const filters = new QueryBuilder(query)
+        .search()
+        .filter("provider")
+        .filter("model")
+        .filter("isPinned")
+        .build();
+
+    filters.user = userId;
+    filters.isArchived = false;
+
+    console.log(filters);
+
+    return chatRepository.findChats(filters);
 };
 
 const getChatById = async (chatId, userId) => {
@@ -127,11 +144,11 @@ export const chatService = {
     createChat,
     getChats,
     getChatById,
+    updateChat,
+    deleteChat,
     verifyChatAccess,
     updateChatActivity,
     updateChatTitle,
-    updateChat,
-    deleteChat,
     renameChat,
     togglePin,
     toggleArchive,

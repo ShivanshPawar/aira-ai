@@ -21,8 +21,11 @@ export const createChat = asyncHandler(async (req, res) => {
 });
 
 export const getChats = asyncHandler(async (req, res) => {
-
-    const chats = await chatService.getChats(req.auth.userId);
+    console.log(req.query)
+    const chats = await chatService.getChats(
+        req.auth.userId,
+        req.query
+    );
 
     return ApiResponse.success(
         res,

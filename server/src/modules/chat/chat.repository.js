@@ -8,13 +8,14 @@ const findById = async (chatId) => {
     return Chat.findById(chatId);
 };
 
-const findByUser = async (userId) => {
-    return Chat.find({
-        user: userId,
-        isArchived: false,
-    }).sort({
+const findChats = async (
+    filters,
+    sort = {
+        isPinned: -1,
         lastMessageAt: -1,
-    });
+    }
+) => {
+    return Chat.find(filters).sort(sort);
 };
 
 const updateById = async (chatId, data) => {
@@ -51,7 +52,7 @@ const updateChatActivity = async (chatId, lastMessageId) => {
 export const chatRepository = {
     create,
     findById,
-    findByUser,
+    findChats,
     updateById,
     deleteById,
     updateChatActivity,
