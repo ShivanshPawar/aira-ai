@@ -16,6 +16,8 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
 import chatRoutes from "./modules/chat/chat.routes.js";
 import messageRoutes from "./modules/messages/message.routes.js";
+import fileRoutes from "./modules/files/file.routes.js";
+
 
 const app = express();
 
@@ -50,6 +52,8 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/chats", chatRoutes);
 
 app.use("/api/v1/messages", messageRoutes);
+
+app.use("/api/v1/files",fileRoutes)
 
 // Error Handling
 
