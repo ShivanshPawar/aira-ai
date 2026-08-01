@@ -1,9 +1,16 @@
-export const buildConversationPrompt = (messages) => {
+export const buildConversation = (messages) => {
+
     return messages.map((message) => ({
+
         role:
             message.role === "USER"
                 ? "user"
                 : "model",
-        content: message.content
+
+        content: message.content,
+
+        attachments: message.attachments || [],
+
     }));
+
 };

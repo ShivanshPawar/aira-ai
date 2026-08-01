@@ -1,27 +1,21 @@
 import { GoogleGenAI } from "@google/genai";
 import { env } from "../../../config/env.js";
+import { buildGeminiContents } from "../utils/attachment.builder.js";
 
 const client = new GoogleGenAI({
     apiKey: env.GEMINI_API_KEY
 });
 
 const generateResponse = async (
-    messages,
+    conversation,
     options = {}
 ) => {
 
     const model = options.model || "gemini-2.5-flash";
 
-    const contents = messages.map((message) => ({
-        role: message.role,
-        parts: [
-            {
-                text: message.content,
-            },
-        ],
-    }));
+    const contents = await buildGeminiContents(conversation);
 
-    console.log(JSON.stringify(contents, null, 2));
+    // console.log(JSON.stringify(contents, null, 2));
 
     const response = await client.models.generateContent({
         model,
@@ -55,14 +49,7 @@ const generateStream = async (
 
     const model = options.model || "gemini-2.5-flash";
 
-    const contents = messages.map((message) => ({
-        role: message.role,
-        parts: [
-            {
-                text: message.content,
-            },
-        ],
-    }));
+    const contents = await buildGeminiContents(conversation);
 
 
     const stream = await client.models.generateContentStream({

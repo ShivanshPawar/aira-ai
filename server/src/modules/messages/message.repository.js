@@ -9,7 +9,13 @@ const findMessageById = async (messageId) => {
 };
 
 const findMessagesByChat = async (chatId) => {
-    return Message.find({ chat: chatId }).sort({ createdAt: 1 });
+    return Message.find({
+        chat: chatId,
+    })
+        .populate("attachments")
+        .sort({
+            createdAt: 1,
+        });;
 };
 
 const updateMessage = async (messageId, data) => {

@@ -8,7 +8,8 @@ export const sendMessage = asyncHandler(async (req, res) => {
     const message = await messageService.sendUserMessage(
         req.auth.userId,
         req.body.chatId,
-        req.body.content
+        req.body.content,
+        req.body.attachments
     );
 
 

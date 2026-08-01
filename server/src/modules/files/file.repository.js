@@ -19,6 +19,16 @@ const updateFile = (fileId, data) => {
     );
 };
 
+const findFileById = (fileId) => {
+    return File.findById(fileId);
+};
+
+const findFilesByIds = (fileIds) => {
+    return File.find({
+        _id: { $in: fileIds },
+    });
+};
+
 const deleteFile = (fileId) => {
     return File.findByIdAndDelete(fileId);
 };
@@ -27,5 +37,7 @@ export const fileRepository = {
     createFile,
     findById,
     updateFile,
+    findFileById,
+    findFilesByIds,
     deleteFile,
 };

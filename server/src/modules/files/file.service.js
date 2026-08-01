@@ -65,6 +65,102 @@ const uploadFile = async (
     return savedFile;
 };
 
+const getFileById = async (fileId) => {
+
+    const file = await fileRepository.findFileById(fileId);
+
+    if (!file) {
+        throw new ApiError(
+            HTTP_STATUS.NOT_FOUND,
+            "File not found"
+        );
+    }
+
+    return file;
+};
+
+const getFilesByIds = async (fileIds = []) => {
+
+    if (!fileIds.length) {
+        return [];
+    }
+
+    return fileRepository.findFilesByIds(fileIds);
+};
+
+const verifyOwnership = async (
+    userId,
+    fileIds = []
+) => {
+
+    if (!fileIds.length) {
+        return [];
+    }
+
+    const files = await fileRepository.findFilesByIds(fileIds);
+
+    if (files.length !== fileIds.length) {
+        throw new ApiError(
+            HTTP_STATUS.NOT_FOUND,
+            "One or more files not found."
+        );
+    }
+
+    for (const file of files) {
+
+        if (file.user.toString() !== userId.toString()) {
+
+            throw new ApiError(
+                HTTP_STATUS.FORBIDDEN,
+                "You don't own this file."
+            );
+
+        }
+
+        if (file.status !== FILE_STATUS.READY) {
+
+            throw new ApiError(
+                HTTP_STATUS.BAD_REQUEST,
+                "File upload is not complete."
+            );
+
+        }
+
+    }
+
+    return files;
+};
+
+const deleteFile = async (
+    userId,
+    fileId
+) => {
+
+    const file = await getFileById(fileId);
+
+    if (file.user.toString() !== userId.toString()) {
+
+        throw new ApiError(
+            HTTP_STATUS.FORBIDDEN,
+            "Unauthorized"
+        );
+
+    }
+
+    await storageService.remove(
+        file.providerFileId,
+        file.provider
+    );
+
+    await fileRepository.deleteFile(fileId);
+
+    return true;
+};
+
 export const fileService = {
     uploadFile,
+    getFileById,
+    getFilesByIds,
+    verifyOwnership,
+    deleteFile
 };

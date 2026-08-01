@@ -29,6 +29,13 @@ const messageSchema = new mongoose.Schema({
         trim: true
     },
 
+    attachments: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "File",
+        },
+    ],
+
     provider: {
         type: String,
         default: null,
@@ -78,7 +85,7 @@ const messageSchema = new mongoose.Schema({
             default: null
         },
 
-       
+
     },
 
 }, {

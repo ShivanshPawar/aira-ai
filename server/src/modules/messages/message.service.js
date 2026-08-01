@@ -5,12 +5,13 @@ import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { aiService } from "../ai/ai.service.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
-import { buildConversationPrompt } from "../ai/prompt.builder.js";
+import { buildConversation } from "../ai/conversation.builder.js";
 
 const sendUserMessage = async (
     userId,
     chatId,
-    content
+    content,
+    attachments = []
 ) => {
 
     await chatService.verifyChatAccess(chatId, userId);
@@ -19,14 +20,15 @@ const sendUserMessage = async (
         chat: chatId,
         user: userId,
         content,
-        role: MESSAGE_ROLES.USER
+        role: MESSAGE_ROLES.USER,
+        attachments,
     });
 
     const history = await messageRepository.findMessagesByChat(chatId)
 
-    const prompt = buildConversationPrompt(history);
+    const conversation = buildConversation(history);
 
-    const aiResponse = await aiService.generateResponse(prompt)
+    const aiResponse = await aiService.generateResponse(conversation)
 
     const assistantMessage = await messageRepository.createMessage({
         chat: chatId,
@@ -56,7 +58,8 @@ const streamMessage = async (
     userId,
     chatId,
     content,
-    callbacks = {}
+    callbacks = {},
+    attachments = []
 ) => {
 
     const {
@@ -74,13 +77,14 @@ const streamMessage = async (
             user: userId,
             role: MESSAGE_ROLES.USER,
             content,
+            attachments,
         });
 
         const history = await messageRepository.findMessagesByChat(chatId);
 
-        const prompt = buildConversationPrompt(history);
+        const conversation = buildConversation(history);
 
-        const stream = await aiService.generateStream(prompt);
+        const stream = await aiService.generateStream(conversation);
 
         let assistantText = "";
 
@@ -114,7 +118,7 @@ const streamMessage = async (
             model: DEFAULT_MODEL,
 
             tokenUsage: {
-                promptTokens: usage?.promptTokens ?? 0,
+                conversationTokens: usage?.conversationTokens ?? 0,
                 completionTokens: usage?.completionTokens ?? 0,
                 totalTokens: usage?.totalTokens ?? 0,
             },
