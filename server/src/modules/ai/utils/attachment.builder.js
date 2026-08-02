@@ -1,85 +1,53 @@
-import axios from "axios";
+import { FILE_TYPES } from "../../files/file.constants.js";
 
-const downloadAsBase64 = async (url) => {
+import { imageHandler } from "./handlers/image.handler.js";
+import { pdfHandler } from "./handlers/pdf.handler.js";
+import { textHandler } from "./handlers/text.handler.js";
+import { markdownHandler } from "./handlers/markdown.handler.js";
 
-    const response = await axios.get(url, {
-        responseType: "arraybuffer",
-    });
-
-    return Buffer
-        .from(response.data)
-        .toString("base64");
-};
-
-const buildImagePart = async (attachment) => {
-
-    const base64 = await downloadAsBase64(
-        attachment.url
-    );
-
-    return {
-        inlineData: {
-            mimeType: attachment.mimeType,
-            data: base64,
-        },
-    };
-
+const handlers = {
+    [FILE_TYPES.IMAGE]: imageHandler,
+    [FILE_TYPES.DOCUMENT]: pdfHandler,
+    [FILE_TYPES.TEXT]: textHandler,
+    [FILE_TYPES.MARKDOWN]: markdownHandler,
 };
 
 const buildParts = async (message) => {
-
     const parts = [];
 
     if (message.content?.trim()) {
-
         parts.push({
             text: message.content,
         });
-
     }
 
-    for (const attachment of message.attachments) {
+    for (const attachment of message.attachments || []) {
+        const handler = handlers[attachment.fileType];
 
-        if (
-            attachment.fileType !== "IMAGE"
-        ) {
-
+        if (!handler) {
             continue;
-
         }
 
-        parts.push(
-            await buildImagePart(
+        const handlerParts =
+            await handler.buildParts(
                 attachment
-            )
-        );
+            );
 
+        parts.push(...handlerParts);
     }
 
     return parts;
-
 };
 
-export const buildGeminiContents = async (
-    conversation
-) => {
-
+export const buildGeminiContents = async (conversation) => {
     const contents = [];
 
     for (const message of conversation) {
-
         contents.push({
-
             role: message.role,
-
-            parts: await buildParts(
-                message
-            ),
-
+            parts: await buildParts(message),
         });
-
     }
 
     return contents;
-
 };
