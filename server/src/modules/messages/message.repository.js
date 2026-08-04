@@ -1,3 +1,4 @@
+import { MESSAGE_ROLES } from "../../shared/constants/message.js";
 import { Message } from "./message.model.js";
 
 const createMessage = async (messageData) => {
@@ -17,6 +18,49 @@ const findMessagesByChat = async (chatId) => {
             createdAt: 1,
         });;
 };
+
+
+const findLastMessageByChat = async (chatId) => {
+    return Message.findOne({
+        chat: chatId,
+    }).sort({
+        createdAt: -1,
+    });
+};
+
+
+const findPreviousUserMessage = async (
+    chatId,
+    assistantCreatedAt,
+) => {
+
+    return Message.findOne({
+        chat: chatId,
+        role: MESSAGE_ROLES.USER,
+
+        createdAt: {
+            $lt: assistantCreatedAt,
+        },
+    }).sort({
+        createdAt: -1,
+    });
+};
+
+const deleteMessagesAfter = async (
+    chatId,
+    createdAt
+) => {
+
+    return Message.deleteMany({
+        chat: chatId,
+        createdAt: {
+            $gt: createdAt,
+        },
+    });
+
+};
+
+
 
 const updateMessage = async (messageId, data) => {
     return Message.findByIdAndUpdate(
@@ -41,4 +85,7 @@ export const messageRepository = {
     findMessagesByChat,
     updateMessage,
     deleteMessage,
+    findLastMessageByChat,
+    findPreviousUserMessage,
+    deleteMessagesAfter,
 };

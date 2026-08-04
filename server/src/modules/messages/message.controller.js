@@ -22,6 +22,42 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
 });
 
+export const regenerateResponse = asyncHandler(async (req, res) => {
+
+    const response =
+        await messageService.regenerateResponse(
+            req.auth.userId,
+            req.params.messageId
+        );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Response regenerated successfully",
+        response
+    );
+
+});
+
+export const editMessage = asyncHandler(async (req, res) => {
+
+    const response =
+        await messageService.editMessage(
+            req.auth.userId,
+            req.params.messageId,
+            req.body.content,
+            req.body.attachments
+        );
+
+    return ApiResponse.success(
+        res,
+        HTTP_STATUS.OK,
+        "Message edited successfully",
+        response
+    );
+
+});
+
 export const getMessages = asyncHandler(async (req, res) => {
 
     const messages = await messageService.getMessagesbyChat(

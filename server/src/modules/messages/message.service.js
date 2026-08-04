@@ -7,6 +7,52 @@ import { aiService } from "../ai/ai.service.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
 import { buildConversation } from "../ai/conversation.builder.js";
 
+const generateAssistantResponse = async (
+    userId,
+    chatId
+) => {
+
+    const history =
+        await messageRepository.findMessagesByChat(chatId);
+
+    const prompt =
+        buildConversation(history);
+
+    const aiResponse =
+        await aiService.generateResponse(prompt);
+
+    const assistantMessage =
+        await messageRepository.createMessage({
+
+            chat: chatId,
+
+            user: userId,
+
+            role: MESSAGE_ROLES.ASSISTANT,
+
+            content: aiResponse.content,
+
+            provider: DEFAULT_PROVIDER,
+
+            model: DEFAULT_MODEL,
+
+            tokenUsage: aiResponse.usage,
+
+            metadata: {
+                finishReason:
+                    aiResponse.finishReason,
+            },
+
+        });
+
+    await chatService.updateChatActivity(
+        chatId,
+        assistantMessage._id
+    );
+
+    return assistantMessage;
+};
+
 const sendUserMessage = async (
     userId,
     chatId,
@@ -14,44 +60,157 @@ const sendUserMessage = async (
     attachments = []
 ) => {
 
-    await chatService.verifyChatAccess(chatId, userId);
+    await chatService.verifyChatAccess(
+        chatId,
+        userId
+    );
 
-    const userMessage = await messageRepository.createMessage({
-        chat: chatId,
-        user: userId,
-        content,
-        role: MESSAGE_ROLES.USER,
-        attachments,
-    });
+    const userMessage =
+        await messageRepository.createMessage({
 
-    const history = await messageRepository.findMessagesByChat(chatId)
+            chat: chatId,
 
-    const conversation = buildConversation(history);
+            user: userId,
 
-    const aiResponse = await aiService.generateResponse(conversation)
+            role: MESSAGE_ROLES.USER,
 
-    const assistantMessage = await messageRepository.createMessage({
-        chat: chatId,
-        user: userId,
-        role: MESSAGE_ROLES.ASSISTANT,
-        content: aiResponse.content,
-        provider: DEFAULT_PROVIDER,
-        model: DEFAULT_MODEL,
-        tokenUsage: aiResponse.usage,
-        metadata: {
-            finishReason: aiResponse.finishReason,
-        },
-    });
+            content,
 
-    await chatService.updateChatActivity(chatId, assistantMessage._id);
+            attachments,
 
-    await chatService.updateChatTitle(chatId, content);
+        });
+
+    const assistantMessage =
+        await generateAssistantResponse(
+            userId,
+            chatId
+        );
 
     return {
         userMessage,
-        assistantMessage
+        assistantMessage,
+    };
+
+};
+
+const regenerateResponse = async (
+    userId,
+    assistantMessageId
+) => {
+
+    const assistantMessage =
+        await getMessageById(
+            userId,
+            assistantMessageId
+        );
+
+    if (
+        assistantMessage.role !==
+        MESSAGE_ROLES.ASSISTANT
+    ) {
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Only assistant messages can be regenerated."
+        );
     }
-}
+
+    const lastMessage =
+        await messageRepository.findLastMessageByChat(
+            assistantMessage.chat
+        );
+
+    if (
+        lastMessage._id.toString() !==
+        assistantMessage._id.toString()
+    ) {
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Only the latest assistant response can be regenerated."
+        );
+    }
+
+    const userMessage =
+        await messageRepository.findPreviousUserMessage(
+            assistantMessage.chat,
+            assistantMessage.createdAt
+        );
+
+    if (!userMessage) {
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Previous user message not found."
+        );
+    }
+
+    await messageRepository.deleteMessage(
+        assistantMessage._id
+    );
+
+    await chatService.updateChatActivity(
+        assistantMessage.chat,
+        userMessage._id
+    );
+
+    const newAssistantMessage =
+        await generateAssistantResponse(
+            userId,
+            assistantMessage.chat
+        );
+
+    return {
+        userMessage,
+        assistantMessage: newAssistantMessage,
+    };
+};
+
+const editMessage = async (
+    userId,
+    messageId,
+    content,
+    attachments = []
+) => {
+
+    const userMessage = await getMessageById(
+        userId,
+        messageId
+    );
+
+    if (userMessage.role !== MESSAGE_ROLES.USER) {
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Only user messages can be edited."
+        );
+    }
+
+    await messageRepository.updateMessage(
+        messageId,
+        {
+            content,
+            attachments,
+        }
+    );
+
+    await messageRepository.deleteMessagesAfter(
+        userMessage.chat,
+        userMessage.createdAt
+    );
+
+    await chatService.updateChatActivity(
+        userMessage.chat,
+        userMessage._id
+    );
+
+    const assistantMessage =
+        await generateAssistantResponse(
+            userId,
+            userMessage.chat
+        );
+
+    return {
+        userMessage: await messageRepository.findMessageById(messageId),
+        assistantMessage,
+    };
+};
 
 
 const streamMessage = async (
@@ -171,6 +330,8 @@ const deleteMessage = async (userId, messageId) => {
 
 export const messageService = {
     sendUserMessage,
+    regenerateResponse,
+    editMessage,
     streamMessage,
     getMessagesbyChat,
     getMessageById,

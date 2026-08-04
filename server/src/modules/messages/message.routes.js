@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { validate } from "../../middlewares/validation.middleware.js";
-import { deleteMessage, getMessages, sendMessage, streamMessage } from "./message.controller.js";
+import { deleteMessage, editMessage, getMessages, regenerateResponse, sendMessage, streamMessage } from "./message.controller.js";
 import { sendMessageSchema } from "./message.validator.js";
 import { protect } from "../../middlewares/auth.middleware.js";
 
@@ -10,6 +10,10 @@ const router = Router();
 router.use(protect);
 
 router.post("/", validate(sendMessageSchema), sendMessage);
+
+router.post("/:messageId/regenerate", regenerateResponse);
+
+router.put("/:messageId",validate(sendMessageSchema),editMessage);
 
 const streamMessageSchema = sendMessageSchema;
 
