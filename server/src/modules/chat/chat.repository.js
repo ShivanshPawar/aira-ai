@@ -57,6 +57,27 @@ const updateChatActivity = async (chatId, lastMessageId) => {
     );
 };
 
+const incrementTokenUsage = async (
+    chatId,
+    usage
+) => {
+
+    return Chat.findByIdAndUpdate(
+        chatId,
+        {
+            $inc: {
+                "tokenUsage.prompt": usage.prompt,
+                "tokenUsage.completion": usage.completion,
+                "tokenUsage.total": usage.total,
+            },
+        },
+        {
+            new: true,
+        }
+    );
+
+};
+
 export const chatRepository = {
     create,
     findById,
@@ -65,4 +86,5 @@ export const chatRepository = {
     updateById,
     deleteById,
     updateChatActivity,
+    incrementTokenUsage,
 };

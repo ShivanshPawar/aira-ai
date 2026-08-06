@@ -15,8 +15,6 @@ const generateResponse = async (
 
     const contents = await buildGeminiContents(conversation);
 
-    // console.log(JSON.stringify(contents, null, 2));
-
     const response = await client.models.generateContent({
         model,
         contents,

@@ -58,8 +58,24 @@ const chatSchema = new mongoose.Schema({
     messageCount: {
         type: Number,
         default: 0
-    }
+    },
 
+    tokenUsage: {
+        prompt: {
+            type: Number,
+            default: 0,
+        },
+
+        completion: {
+            type: Number,
+            default: 0,
+        },
+
+        total: {
+            type: Number,
+            default: 0,
+        },
+    },
 
 }, {
     timestamps: true,

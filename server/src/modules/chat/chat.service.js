@@ -138,7 +138,7 @@ const updateChatTitle = async (chatId, firstMessage) => {
 
     if (!chat) return;
 
-    if (chat.title !== "Untitled") {
+    if (chat.title !== "New Chat") {
         return;
     }
 
@@ -172,6 +172,24 @@ const toggleArchive = async (chatId, userId) => {
     })
 }
 
+const incrementTokenUsage = async (
+    chatId,
+    usage
+) => {
+
+    if (!usage) return;
+
+    await chatRepository.incrementTokenUsage(
+        chatId,
+        {
+            prompt: usage.prompt ?? 0,
+            completion: usage.completion ?? 0,
+            total: usage.total ?? 0,
+        }
+    );
+
+};
+
 export const chatService = {
     createChat,
     getChats,
@@ -185,4 +203,5 @@ export const chatService = {
     renameChat,
     togglePin,
     toggleArchive,
+    incrementTokenUsage
 }

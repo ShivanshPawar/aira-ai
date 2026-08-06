@@ -1,16 +1,19 @@
-export const buildConversation = (messages) => {
+import { buildContextWindow } from "./utils/context-window.js";
 
-    return messages.map((message) => ({
+export const buildConversation = (history) => {
 
-        role:
-            message.role === "USER"
-                ? "user"
-                : "model",
+    const context = buildContextWindow(history);
+
+    return context.map((message) => ({
+
+        role: message.role === "USER"
+            ? "user"
+            : "model",
 
         content: message.content,
 
         attachments: message.attachments || [],
 
-    }));
+    }));;
 
 };

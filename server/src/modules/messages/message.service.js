@@ -12,42 +12,43 @@ const generateAssistantResponse = async (
     chatId
 ) => {
 
-    const history =
-        await messageRepository.findMessagesByChat(chatId);
+    const history = await messageRepository.findMessagesByChat(chatId);
 
-    const prompt =
-        buildConversation(history);
+    const prompt = buildConversation(history);
 
-    const aiResponse =
-        await aiService.generateResponse(prompt);
+    const aiResponse = await aiService.generateResponse(prompt);
 
-    const assistantMessage =
-        await messageRepository.createMessage({
+    const assistantMessage = await messageRepository.createMessage({
 
-            chat: chatId,
+        chat: chatId,
 
-            user: userId,
+        user: userId,
 
-            role: MESSAGE_ROLES.ASSISTANT,
+        role: MESSAGE_ROLES.ASSISTANT,
 
-            content: aiResponse.content,
+        content: aiResponse.content,
 
-            provider: DEFAULT_PROVIDER,
+        provider: DEFAULT_PROVIDER,
 
-            model: DEFAULT_MODEL,
+        model: DEFAULT_MODEL,
 
-            tokenUsage: aiResponse.usage,
+        tokenUsage: aiResponse.usage,
 
-            metadata: {
-                finishReason:
-                    aiResponse.finishReason,
-            },
+        metadata: {
+            finishReason:
+                aiResponse.finishReason,
+        },
 
-        });
+    });
 
     await chatService.updateChatActivity(
         chatId,
         assistantMessage._id
+    );
+
+    await chatService.incrementTokenUsage(
+        chatId,
+        aiResponse.usage
     );
 
     return assistantMessage;
@@ -65,8 +66,7 @@ const sendUserMessage = async (
         userId
     );
 
-    const userMessage =
-        await messageRepository.createMessage({
+    const userMessage = await messageRepository.createMessage({
 
             chat: chatId,
 
@@ -80,8 +80,7 @@ const sendUserMessage = async (
 
         });
 
-    const assistantMessage =
-        await generateAssistantResponse(
+    const assistantMessage = await generateAssistantResponse(
             userId,
             chatId
         );
@@ -98,15 +97,13 @@ const regenerateResponse = async (
     assistantMessageId
 ) => {
 
-    const assistantMessage =
-        await getMessageById(
-            userId,
-            assistantMessageId
-        );
+    const assistantMessage = await getMessageById(
+        userId,
+        assistantMessageId
+    );
 
     if (
-        assistantMessage.role !==
-        MESSAGE_ROLES.ASSISTANT
+        assistantMessage.role !== MESSAGE_ROLES.ASSISTANT
     ) {
         throw new ApiError(
             HTTP_STATUS.BAD_REQUEST,
@@ -114,14 +111,12 @@ const regenerateResponse = async (
         );
     }
 
-    const lastMessage =
-        await messageRepository.findLastMessageByChat(
+    const lastMessage = await messageRepository.findLastMessageByChat(
             assistantMessage.chat
         );
 
     if (
-        lastMessage._id.toString() !==
-        assistantMessage._id.toString()
+        lastMessage._id.toString() !== assistantMessage._id.toString()
     ) {
         throw new ApiError(
             HTTP_STATUS.BAD_REQUEST,
@@ -129,11 +124,10 @@ const regenerateResponse = async (
         );
     }
 
-    const userMessage =
-        await messageRepository.findPreviousUserMessage(
-            assistantMessage.chat,
-            assistantMessage.createdAt
-        );
+    const userMessage = await messageRepository.findPreviousUserMessage(
+        assistantMessage.chat,
+        assistantMessage.createdAt
+    );
 
     if (!userMessage) {
         throw new ApiError(
@@ -151,11 +145,10 @@ const regenerateResponse = async (
         userMessage._id
     );
 
-    const newAssistantMessage =
-        await generateAssistantResponse(
-            userId,
-            assistantMessage.chat
-        );
+    const newAssistantMessage = await generateAssistantResponse(
+        userId,
+        assistantMessage.chat
+    );
 
     return {
         userMessage,
@@ -200,11 +193,10 @@ const editMessage = async (
         userMessage._id
     );
 
-    const assistantMessage =
-        await generateAssistantResponse(
-            userId,
-            userMessage.chat
-        );
+    const assistantMessage = await generateAssistantResponse(
+        userId,
+        userMessage.chat
+    );
 
     return {
         userMessage: await messageRepository.findMessageById(messageId),
@@ -288,6 +280,8 @@ const streamMessage = async (
         });
 
         await chatService.updateChatActivity(chatId, assistantMessage._id);
+
+        await chatService.incrementTokenUsage(chatId, usage);
 
         await chatService.updateChatTitle(chatId, content);
 

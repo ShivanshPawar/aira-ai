@@ -4,10 +4,9 @@ const MAX_CHARACTERS = 50000;
 
 const buildParts = async (attachment) => {
 
-    const markdown =
-        await downloadUtil.downloadAsText(
-            attachment.url
-        );
+    const markdown = await downloadUtil.downloadAsText(
+        attachment.url
+    );
 
     const content = markdown
         ?.trim()
