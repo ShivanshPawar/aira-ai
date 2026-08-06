@@ -77,6 +77,18 @@ const chatSchema = new mongoose.Schema({
         },
     },
 
+    summary: {
+        content: {
+            type: String,
+            default: "",
+        },
+
+        updatedAt: {
+            type: Date,
+            default: null,
+        },
+    },
+
 }, {
     timestamps: true,
     versionKey: false,

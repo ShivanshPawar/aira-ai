@@ -6,17 +6,21 @@ import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { aiService } from "../ai/ai.service.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
 import { buildConversation } from "../ai/conversation.builder.js";
+import { summaryService } from "../ai/services/summary.service.js";
+
 
 const generateAssistantResponse = async (
     userId,
     chatId
 ) => {
 
+    const chat = await chatService.getChatById(chatId, userId);
+
     const history = await messageRepository.findMessagesByChat(chatId);
 
-    const prompt = buildConversation(history);
+    const conversation = buildConversation(history, chat);
 
-    const aiResponse = await aiService.generateResponse(prompt);
+    const aiResponse = await aiService.generateResponse(conversation);
 
     const assistantMessage = await messageRepository.createMessage({
 
@@ -51,6 +55,18 @@ const generateAssistantResponse = async (
         aiResponse.usage
     );
 
+    const shouldSummarize = await chatService.shouldGenerateSummary(
+        chatId
+    );
+
+    if (shouldSummarize) {
+
+        await generateConversationSummary(
+            chatId
+        );
+
+    }
+
     return assistantMessage;
 };
 
@@ -68,22 +84,22 @@ const sendUserMessage = async (
 
     const userMessage = await messageRepository.createMessage({
 
-            chat: chatId,
+        chat: chatId,
 
-            user: userId,
+        user: userId,
 
-            role: MESSAGE_ROLES.USER,
+        role: MESSAGE_ROLES.USER,
 
-            content,
+        content,
 
-            attachments,
+        attachments,
 
-        });
+    });
 
     const assistantMessage = await generateAssistantResponse(
-            userId,
-            chatId
-        );
+        userId,
+        chatId
+    );
 
     return {
         userMessage,
@@ -112,8 +128,8 @@ const regenerateResponse = async (
     }
 
     const lastMessage = await messageRepository.findLastMessageByChat(
-            assistantMessage.chat
-        );
+        assistantMessage.chat
+    );
 
     if (
         lastMessage._id.toString() !== assistantMessage._id.toString()
@@ -322,6 +338,21 @@ const deleteMessage = async (userId, messageId) => {
     return messageRepository.deleteMessage(messageId);
 };
 
+const generateConversationSummary = async (chatId) => {
+
+    const history = await messageRepository.findMessagesByChat(chatId);
+
+    const summary = await summaryService.summarizeConversation(history);
+
+    await chatService.updateSummary(
+        chatId,
+        summary
+    );
+
+    return summary;
+
+};
+
 export const messageService = {
     sendUserMessage,
     regenerateResponse,
@@ -330,4 +361,5 @@ export const messageService = {
     getMessagesbyChat,
     getMessageById,
     deleteMessage,
+    generateConversationSummary
 }

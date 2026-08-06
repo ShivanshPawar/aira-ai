@@ -78,6 +78,26 @@ const incrementTokenUsage = async (
 
 };
 
+const updateSummary = async (
+    chatId,
+    summary
+) => {
+
+    return Chat.findByIdAndUpdate(
+        chatId,
+        {
+            summary: {
+                content: summary,
+                updatedAt: new Date(),
+            },
+        },
+        {
+            new: true,
+        }
+    );
+
+};
+
 export const chatRepository = {
     create,
     findById,
@@ -87,4 +107,5 @@ export const chatRepository = {
     deleteById,
     updateChatActivity,
     incrementTokenUsage,
+    updateSummary,
 };

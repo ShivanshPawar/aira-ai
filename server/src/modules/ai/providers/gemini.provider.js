@@ -41,7 +41,7 @@ const generateResponse = async (
 };
 
 const generateStream = async (
-    messages,
+    conversation,
     options = {}
 ) => {
 

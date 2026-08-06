@@ -4,6 +4,7 @@ import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { generateChatTitle } from "../../shared/utils/titleGenerator.js";
 import { QueryBuilder } from "../../shared/utils/queryBuilder.js";
+import { AI_CONTEXT } from "../ai/ai.constants.js";
 
 const createChat = async (userId, data) => {
 
@@ -190,6 +191,34 @@ const incrementTokenUsage = async (
 
 };
 
+const updateSummary = async (
+    chatId,
+    summary
+) => {
+
+    return chatRepository.updateSummary(
+        chatId,
+        summary
+    );
+
+};
+
+const shouldGenerateSummary = async (chatId) => {
+
+    const chat =
+        await chatRepository.findById(chatId);
+
+    if (!chat) {
+        return false;
+    }
+
+    return (
+        chat.tokenUsage.total >=
+        AI_CONTEXT.SUMMARY_THRESHOLD
+    );
+
+};
+
 export const chatService = {
     createChat,
     getChats,
@@ -203,5 +232,7 @@ export const chatService = {
     renameChat,
     togglePin,
     toggleArchive,
-    incrementTokenUsage
+    incrementTokenUsage,
+    updateSummary,
+    shouldGenerateSummary
 }
