@@ -1,5 +1,23 @@
 import { AI_CONTEXT } from "../ai.constants.js";
 
+const estimateTokens = (value = "") => {
+    return Math.ceil(String(value).length / 3);
+};
+
+const truncateToTokenBudget = (
+    value = "",
+    maxTokens
+) => {
+    return String(value).slice(0, maxTokens * 3);
+};
+
+const getMessageTokens = (message) => {
+    const storedTokens = message.tokenUsage?.total ?? 0;
+    const contentTokens = estimateTokens(message.content ?? "");
+
+    return Math.max(storedTokens, contentTokens);
+};
+
 const buildContextWindow = (
     history,
     summary = "",
@@ -14,12 +32,26 @@ const buildContextWindow = (
 
         const message = history[i];
 
-        const tokens = message.tokenUsage?.total ?? 0;
+        const tokens = getMessageTokens(message);
 
         if (
             totalTokens + tokens >
             maxTokens
         ) {
+            if (selected.length === 0) {
+                selected.unshift({
+                    role: message.role,
+                    content: truncateToTokenBudget(
+                        message.content ?? "",
+                        maxTokens
+                    ),
+                    attachments: message.attachments || [],
+                    tokenUsage: {
+                        total: maxTokens,
+                    },
+                });
+            }
+
             break;
         }
 

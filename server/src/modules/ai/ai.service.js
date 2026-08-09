@@ -1,33 +1,39 @@
 import { aiFactory } from "./ai.factory.js";
-import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "./ai.constants.js";
-import { geminiProvider } from "./providers/gemini.provider.js";
+import { resolveConfig } from "./config/config.resolver.js";
 
 const generateResponse = async (
-    messages,
+    conversation,
     options = {}
 ) => {
-    const provider = aiFactory.getProvider(
-        options.provider || DEFAULT_PROVIDER
-    );
+
+    const config = resolveConfig(options);
+
+    const provider = aiFactory.getProvider(config.provider);
 
     return provider.generateResponse(
-        messages, {
-        model: options.model || DEFAULT_MODEL,
-    });
+        conversation,
+        config
+    );
+
 };
 
 const generateStream = async (
-    messages,
+    conversation,
     options = {}
 ) => {
 
-    return geminiProvider.generateStream(
-        messages,
-        options
+    const config = resolveConfig(options);
+
+    const provider = aiFactory.getProvider(config.provider);
+
+    return provider.generateStream(
+        conversation,
+        config
     );
+
 };
 
 export const aiService = {
     generateResponse,
     generateStream,
-}
+};

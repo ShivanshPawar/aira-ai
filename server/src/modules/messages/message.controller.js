@@ -88,6 +88,13 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 })
 
 export const streamMessage = async (req, res) => {
+
+    console.log("=== STREAM CONTROLLER ===");
+
+    console.log("BODY:", req.body);
+    console.log("CHAT ID:", req.body.chatId);
+    console.log("CONTENT:", req.body.content);
+    console.log("AUTH:", req.auth);
     // SSE Headers (Server-Sent Events)
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

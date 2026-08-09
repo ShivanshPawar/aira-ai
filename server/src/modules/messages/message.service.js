@@ -4,7 +4,12 @@ import { MESSAGE_ROLES } from "../../shared/constants/message.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { aiService } from "../ai/ai.service.js";
-import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
+import {
+    AI_CONTEXT,
+    AI_PROVIDERS,
+    DEFAULT_MODEL,
+    DEFAULT_PROVIDER,
+} from "../ai/ai.constants.js";
 import { buildConversation } from "../ai/conversation.builder.js";
 import { summaryService } from "../ai/services/summary.service.js";
 
@@ -18,9 +23,24 @@ const generateAssistantResponse = async (
 
     const history = await messageRepository.findMessagesByChat(chatId);
 
-    const conversation = buildConversation(history, chat);
+    const aiOptions = {
+        provider: chat.provider ?? DEFAULT_PROVIDER,
+        model: chat.model ?? DEFAULT_MODEL,
+        systemPrompt: chat.systemPrompt ?? undefined,
+    };
 
-    const aiResponse = await aiService.generateResponse(conversation);
+    const maxContextTokens =
+        aiOptions.provider === AI_PROVIDERS.GROQ
+            ? AI_CONTEXT.GROQ_CONTEXT_TOKENS
+            : AI_CONTEXT.MAX_CONTEXT_TOKENS;
+
+    const conversation = buildConversation(
+        history,
+        chat.summary?.content ?? "",
+        maxContextTokens
+    );
+
+    const aiResponse = await aiService.generateResponse(conversation, aiOptions);
 
     const assistantMessage = await messageRepository.createMessage({
 
@@ -32,9 +52,9 @@ const generateAssistantResponse = async (
 
         content: aiResponse.content,
 
-        provider: DEFAULT_PROVIDER,
+        provider: aiOptions.provider,
 
-        model: DEFAULT_MODEL,
+        model: aiOptions.model,
 
         tokenUsage: aiResponse.usage,
 
@@ -61,9 +81,12 @@ const generateAssistantResponse = async (
 
     if (shouldSummarize) {
 
-        await generateConversationSummary(
-            chatId
-        );
+        generateConversationSummary(chatId, aiOptions).catch((error) => {
+            console.error(
+                "Failed to generate conversation summary",
+                error
+            );
+        });
 
     }
 
@@ -229,6 +252,15 @@ const streamMessage = async (
     attachments = []
 ) => {
 
+    console.log("=== STREAM SERVICE ===");
+
+    console.log({
+        userId,
+        chatId,
+        content,
+        attachments,
+    });
+
     const {
         onToken = (text) => { },
         onComplete = ({ assistantMessage }) => { },
@@ -237,21 +269,43 @@ const streamMessage = async (
 
     try {
 
-        await chatService.verifyChatAccess(chatId, userId);
+        const chat = await chatService.verifyChatAccess(chatId, userId);
 
         await messageRepository.createMessage({
             chat: chatId,
             user: userId,
             role: MESSAGE_ROLES.USER,
-            content,
+            content: content,
             attachments,
         });
 
         const history = await messageRepository.findMessagesByChat(chatId);
 
-        const conversation = buildConversation(history);
+        const aiOptions = {
+            provider: chat.provider ?? DEFAULT_PROVIDER,
+            model: chat.model ?? DEFAULT_MODEL,
+            systemPrompt: chat.systemPrompt ?? undefined,
+        };
 
-        const stream = await aiService.generateStream(conversation);
+        const maxContextTokens =
+            provider === AI_PROVIDERS.GROQ
+                ? AI_CONTEXT.GROQ_CONTEXT_TOKENS
+                : AI_CONTEXT.MAX_CONTEXT_TOKENS;
+
+        const conversation = buildConversation(
+            history,
+            chat.summary?.content ?? "",
+            maxContextTokens
+        );
+
+        const stream = await aiService.generateStream(
+            conversation,
+            {
+                provider,
+                model,
+                systemPrompt: chat.systemPrompt ?? undefined,
+            }
+        );
 
         let assistantText = "";
 
@@ -259,20 +313,60 @@ const streamMessage = async (
 
         let usage = null;
 
-        for await (const chunk of stream) {
+        for await (const event of stream) {
 
-            const text = chunk.text || "";
+            if (event.type === "token") {
 
-            if (!text) continue;
+                const text = event.content;
 
-            assistantText += text;
+                if (!text) continue;
 
-            onToken(text);
+                assistantText += text;
 
-            finishReason = chunk.candidates?.[0]?.finishReason ?? finishReason;
+                onToken(text);
 
-            usage = chunk.usageMetadata ?? usage;
+                continue;
+            }
+
+            if (event.type === "done") {
+
+                finishReason =
+                    event.finishReason ?? null;
+
+                usage =
+                    event.usage ?? null;
+
+                continue;
+            }
+
+            if (event.type === "error") {
+
+                throw new Error(
+                    event.error?.message ??
+                    event.error ??
+                    "AI stream failed"
+                );
+            }
+
         }
+
+        const tokenUsage = {
+            prompt:
+                usage?.prompt ??
+                usage?.prompt_tokens ??
+                usage?.promptTokenCount ??
+                0,
+            completion:
+                usage?.completion ??
+                usage?.completion_tokens ??
+                usage?.candidatesTokenCount ??
+                0,
+            total:
+                usage?.total ??
+                usage?.total_tokens ??
+                usage?.totalTokenCount ??
+                0,
+        };
 
         const assistantMessage = await messageRepository.createMessage({
             chat: chatId,
@@ -281,23 +375,19 @@ const streamMessage = async (
 
             content: assistantText,
 
-            provider: DEFAULT_PROVIDER,
-            model: DEFAULT_MODEL,
+            provider,
+            model,
 
-            tokenUsage: {
-                conversationTokens: usage?.conversationTokens ?? 0,
-                completionTokens: usage?.completionTokens ?? 0,
-                totalTokens: usage?.totalTokens ?? 0,
-            },
+            tokenUsage,
 
             metadata: {
                 finishReason,
             },
         });
 
-        await chatService.updateChatActivity(chatId, assistantMessage._id);
+        await chatService.incrementTokenUsage(chatId, tokenUsage);
 
-        await chatService.incrementTokenUsage(chatId, usage);
+        await chatService.updateChatActivity(chatId, assistantMessage._id);
 
         await chatService.updateChatTitle(chatId, content);
 
@@ -338,11 +428,20 @@ const deleteMessage = async (userId, messageId) => {
     return messageRepository.deleteMessage(messageId);
 };
 
-const generateConversationSummary = async (chatId) => {
+const generateConversationSummary = async (
+    chatId,
+    aiOptions = {}
+) => {
 
     const history = await messageRepository.findMessagesByChat(chatId);
 
-    const summary = await summaryService.summarizeConversation(history);
+    const summary = await summaryService.summarizeConversation(
+        history,
+        {
+            provider: aiOptions.provider ?? DEFAULT_PROVIDER,
+            model: aiOptions.model ?? DEFAULT_MODEL,
+        }
+    );
 
     await chatService.updateSummary(
         chatId,

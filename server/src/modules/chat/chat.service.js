@@ -1,23 +1,22 @@
 import { chatRepository } from "./chat.repository.js";
-import { AI_MODELS, AI_PROVIDERS } from "./../../shared/constants/ai.js";
+import { AI_CONTEXT, AI_MODELS, AI_PROVIDERS, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { generateChatTitle } from "../../shared/utils/titleGenerator.js";
 import { QueryBuilder } from "../../shared/utils/queryBuilder.js";
-import { AI_CONTEXT } from "../ai/ai.constants.js";
 
 const createChat = async (userId, data) => {
 
-    const provider = data.provider || AI_PROVIDERS.GEMINI;
+    const provider = data.provider || DEFAULT_PROVIDER;
     let model = data.model;
 
     if (!model) {
-        model = provider === AI_PROVIDERS.GEMINI ? AI_MODELS.GEMINI_FLASH : AI_MODELS.LLAMA_3_3_70B_VERSATILE;
+        model = provider === AI_PROVIDERS.GEMINI ? AI_MODELS.GEMINI_FLASH : AI_MODELS.OPENAI_120B;
     }
 
     return chatRepository.create({
         user: userId,
-        title: "Untitled",
+        title: "New Chat",
         provider,
         model,
     })

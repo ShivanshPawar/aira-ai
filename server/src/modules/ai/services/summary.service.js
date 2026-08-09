@@ -1,17 +1,75 @@
 import { aiService } from "../ai.service.js";
+import { AI_CONTEXT } from "../ai.constants.js";
 
-const buildSummaryPrompt = (history) => {
+const estimateTokens = (value = "") => {
+    return Math.ceil(String(value).length / 3);
+};
 
-    const conversation = history
-        .map(
-            (message) =>
-                `${message.role}: ${message.content}`
-        )
-        .join("\n\n");
+const truncateToTokenBudget = (
+    value = "",
+    maxTokens
+) => {
+    return String(value).slice(0, maxTokens * 3);
+};
+
+const buildSummaryText = (
+    history,
+    maxTokens = AI_CONTEXT.SUMMARY_INPUT_TOKENS
+) => {
+
+    let totalTokens = 0;
+
+    const selected = [];
+
+    for (let i = history.length - 1; i >= 0; i--) {
+
+        const message = history[i];
+
+        const line = `${message.role}: ${message.content}`;
+
+        const tokens = estimateTokens(line);
+
+        if (
+            selected.length === 0 &&
+            tokens > maxTokens
+        ) {
+            selected.unshift(
+                truncateToTokenBudget(line, maxTokens)
+            );
+
+            break;
+        }
+
+        if (
+            selected.length > 0 &&
+            totalTokens + tokens > maxTokens
+        ) {
+            break;
+        }
+
+        selected.unshift(line);
+
+        totalTokens += tokens;
+
+    }
+
+    return selected.join("\n\n");
+
+};
+
+const buildSummaryPrompt = (
+    history,
+    maxInputTokens = AI_CONTEXT.SUMMARY_INPUT_TOKENS
+) => {
+
+    const conversation = buildSummaryText(
+        history,
+        maxInputTokens
+    );
 
     return [
         {
-            role: "USER",
+            role: "user",
             content: `
 You are creating a long-term memory for an AI assistant.
 
@@ -46,11 +104,29 @@ ${conversation}
 
 };
 
-const summarizeConversation = async (history) => {
+const summarizeConversation = async (
+    history,
+    options = {}
+) => {
 
-    const conversation = buildSummaryPrompt(history);
+    const {
+        maxInputTokens = AI_CONTEXT.SUMMARY_INPUT_TOKENS,
+        ...aiOptions
+    } = options;
 
-    const response = await aiService.generateResponse(conversation);
+    const conversation = buildSummaryPrompt(
+        history,
+        maxInputTokens
+    );
+
+    const response = await aiService.generateResponse(
+        conversation,
+        {
+            maxOutputTokens: AI_CONTEXT.SUMMARY_MAX_OUTPUT_TOKENS,
+            ...aiOptions,
+            systemPrompt: null,
+        }
+    );
 
     return response.content;
 

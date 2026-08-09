@@ -1,5 +1,5 @@
 import mongoose from "mongoose"
-import { AI_MODELS, AI_PROVIDERS } from "../../shared/constants/ai.js";
+import { AI_PROVIDERS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../ai/ai.constants.js";
 
 const chatSchema = new mongoose.Schema({
 
@@ -13,19 +13,19 @@ const chatSchema = new mongoose.Schema({
     title: {
         type: String,
         trim: true,
-        default: "Untitled",
+        default: "New Chat",
         maxlength: 120,
     },
 
     provider: {
         type: String,
         enum: Object.values(AI_PROVIDERS),
-        default: AI_PROVIDERS.GEMINI,
+        default: DEFAULT_PROVIDER,
     },
 
     model: {
         type: String,
-        default: AI_MODELS.GEMINI_FLASH,
+        default: DEFAULT_MODEL,
     },
 
     systemPrompt: {
