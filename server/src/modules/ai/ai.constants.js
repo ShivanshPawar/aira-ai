@@ -7,8 +7,6 @@ export const AI_MODELS = {
 
     GEMINI_FLASH: "gemini-2.5-flash",
 
-    GEMINI_PRO: "gemini-2.5-pro",
-
     OPENAI_120B: "openai/gpt-oss-120b",
 
     GROQ_COMPOUND:"groq/compound",

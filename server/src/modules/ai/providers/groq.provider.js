@@ -94,45 +94,45 @@ const generateStream = async (
         },
     });
 
-    console.log("=== GROQ MESSAGES ===");
-    console.dir(messages, { depth: null });
-
     return (async function* () {
+
+        let finalUsage = null;
+        let finalFinishReason = null;
 
         for await (const chunk of stream) {
 
             const choice = chunk.choices?.[0];
 
-            const content = choice?.delta?.content ?? "";
+            const content =
+                choice?.delta?.content ?? "";
 
             if (content) {
-
                 yield createTokenEvent(content);
-
             }
 
-            if (
-                choice?.finish_reason ||
-                chunk.usage
-            ) {
-
-                yield createDoneEvent({
-
-                    finishReason: choice?.finish_reason ?? null,
-
-                    usage: {
-                        prompt: chunk.usage?.prompt_tokens ?? 0,
-
-                        completion: chunk.usage?.completion_tokens ?? 0,
-
-                        total: chunk.usage?.total_tokens ?? 0,
-                    },
-
-                });
-
+            if (choice?.finish_reason) {
+                finalFinishReason =
+                    choice.finish_reason;
             }
 
+            if (chunk.usage) {
+                finalUsage = {
+                    prompt:
+                        chunk.usage.prompt_tokens ?? 0,
+
+                    completion:
+                        chunk.usage.completion_tokens ?? 0,
+
+                    total:
+                        chunk.usage.total_tokens ?? 0,
+                };
+            }
         }
+
+        yield createDoneEvent({
+            finishReason: finalFinishReason,
+            usage: finalUsage,
+        });
 
     })();
 };

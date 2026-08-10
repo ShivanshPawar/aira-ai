@@ -262,64 +262,80 @@ const streamMessage = async (
     });
 
     const {
-        onToken = (text) => { },
-        onComplete = ({ assistantMessage }) => { },
-        onError = (error) => { },
+        onToken = () => { },
+        onComplete = () => { },
+        onError = () => { },
     } = callbacks;
 
     try {
+        // Verify chat access
+        const chat = await chatService.verifyChatAccess(
+            chatId,
+            userId
+        );
 
-        const chat = await chatService.verifyChatAccess(chatId, userId);
-
+        // Save user message
         await messageRepository.createMessage({
             chat: chatId,
             user: userId,
             role: MESSAGE_ROLES.USER,
-            content: content,
+            content,
             attachments,
         });
 
+        // Get conversation history
         const history = await messageRepository.findMessagesByChat(chatId);
 
+        // Resolve AI configuration
+        const provider = chat.provider ?? DEFAULT_PROVIDER;
+
+        const model = chat.model ?? DEFAULT_MODEL;
+
+        const systemPrompt = chat.systemPrompt ?? undefined;
+
+
         const aiOptions = {
-            provider: chat.provider ?? DEFAULT_PROVIDER,
-            model: chat.model ?? DEFAULT_MODEL,
-            systemPrompt: chat.systemPrompt ?? undefined,
+            provider,
+            model,
+            systemPrompt,
         };
 
+        // Resolve context window
         const maxContextTokens =
             provider === AI_PROVIDERS.GROQ
                 ? AI_CONTEXT.GROQ_CONTEXT_TOKENS
                 : AI_CONTEXT.MAX_CONTEXT_TOKENS;
 
+        // Build AI conversation
         const conversation = buildConversation(
             history,
             chat.summary?.content ?? "",
             maxContextTokens
         );
 
+        // Start normalized AI stream
         const stream = await aiService.generateStream(
             conversation,
-            {
-                provider,
-                model,
-                systemPrompt: chat.systemPrompt ?? undefined,
-            }
+            aiOptions
         );
 
+        // Consume normalized stream
         let assistantText = "";
 
         let finishReason = null;
 
         let usage = null;
 
-        for await (const event of stream) {
 
+        for await (const event of stream) {
+            // TOKEN EVENT
             if (event.type === "token") {
 
                 const text = event.content;
 
-                if (!text) continue;
+                if (!text) {
+                    continue;
+                }
 
                 assistantText += text;
 
@@ -328,6 +344,7 @@ const streamMessage = async (
                 continue;
             }
 
+            // DONE EVENT
             if (event.type === "done") {
 
                 finishReason =
@@ -339,6 +356,7 @@ const streamMessage = async (
                 continue;
             }
 
+            // ERROR EVENT
             if (event.type === "error") {
 
                 throw new Error(
@@ -347,35 +365,32 @@ const streamMessage = async (
                     "AI stream failed"
                 );
             }
-
         }
 
+        // Normalize token usage
         const tokenUsage = {
-            prompt:
-                usage?.prompt ??
-                usage?.prompt_tokens ??
-                usage?.promptTokenCount ??
-                0,
-            completion:
-                usage?.completion ??
-                usage?.completion_tokens ??
-                usage?.candidatesTokenCount ??
-                0,
-            total:
-                usage?.total ??
-                usage?.total_tokens ??
-                usage?.totalTokenCount ??
-                0,
+
+            prompt: usage?.prompt ?? 0,
+
+            completion: usage?.completion ?? 0,
+
+            total: usage?.total ?? 0,
+
         };
 
+        // Save assistant message
         const assistantMessage = await messageRepository.createMessage({
+
             chat: chatId,
+
             user: userId,
+
             role: MESSAGE_ROLES.ASSISTANT,
 
             content: assistantText,
 
             provider,
+
             model,
 
             tokenUsage,
@@ -383,24 +398,42 @@ const streamMessage = async (
             metadata: {
                 finishReason,
             },
+
         });
 
-        await chatService.incrementTokenUsage(chatId, tokenUsage);
+        // Update chat token usage
+        await chatService.incrementTokenUsage(
+            chatId,
+            tokenUsage
+        );
 
-        await chatService.updateChatActivity(chatId, assistantMessage._id);
+        // Update chat activity
+        await chatService.updateChatActivity(
+            chatId,
+            assistantMessage._id
+        );
 
-        await chatService.updateChatTitle(chatId, content);
+        // Update chat title
+        await chatService.updateChatTitle(
+            chatId,
+            content
+        );
 
-        await onComplete({ assistantMessage });
+        // Notify controller
+        await onComplete({
+            assistantMessage,
+        });
 
+        // Return assistant message
         return assistantMessage;
 
     } catch (error) {
+
         await onError(error);
         throw error;
     }
-
-}
+    req.body.attachments ?? []
+};
 
 
 const getMessagesbyChat = async (userId, chatId) => {
