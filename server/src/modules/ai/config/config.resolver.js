@@ -53,9 +53,6 @@ const resolveConfig = (options = {}) => {
 
     };
 
-    console.log("=== RESOLVED AI CONFIG ===");
-    console.dir(config, { depth: null });
-
     return config;
 };
 

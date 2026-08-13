@@ -5,7 +5,9 @@ import { buildGroqMessages } from "../adapters/groq.adapter.js";
 import { createAIProviderContract } from "../contracts/ai-provider.contract.js";
 import { createAIResponse } from "../utils/ai-response.js";
 import { createDoneEvent, createTokenEvent } from "../contracts/ai-stream-event.js";
+import { normalizeAIError } from "../utils/ai-error.js";
 
+// initialize the client with your API key
 const client = new Groq({
     apiKey: env.GROQ_API_KEY,
 });
@@ -15,54 +17,53 @@ const generateResponse = async (
     options = {}
 ) => {
 
-    console.log("=== GROQ PROVIDER OPTIONS ===");
-    console.dir(options, { depth: null });
+    try {
 
-    console.log("=== GROQ SYSTEM PROMPT ===");
-    console.log(options.systemPrompt);
+        // build the messages
+        const messages = buildGroqMessages(
+            conversation,
+            options.systemPrompt
+        );
 
-    const messages = buildGroqMessages(
-        conversation,
-        options.systemPrompt
-    );
+        // generate the response
+        const response = await client.chat.completions.create({
 
-    console.log("=== GROQ MESSAGES ===");
-    console.dir(messages, { depth: null });
+            model: options.model,
 
-    const response = await client.chat.completions.create({
+            messages,
 
-        model: options.model,
+            temperature: options.temperature,
 
-        messages,
+            max_completion_tokens: options.maxOutputTokens,
 
-        temperature: options.temperature,
+            top_p: options.topP,
 
-        max_completion_tokens: options.maxOutputTokens,
+        });
 
-        top_p: options.topP,
+        // return the response
+        return createAIResponse({
 
-    });
+            content: response.choices[0].message.content,
 
-    console.log("=== GROQ MESSAGES ===");
-    console.dir(messages, { depth: null });
+            provider: options.provider,
 
-    return createAIResponse({
-        content: response.choices[0].message.content,
+            model: options.model,
 
-        provider: options.provider,
+            finishReason: response.choices[0].finish_reason ?? null,
 
-        model: options.model,
+            usage: {
 
-        finishReason: response.choices[0].finish_reason ?? null,
+                prompt: response.usage?.prompt_tokens ?? 0,
 
-        usage: {
-            prompt: response.usage?.prompt_tokens ?? 0,
+                completion: response.usage?.completion_tokens ?? 0,
 
-            completion: response.usage?.completion_tokens ?? 0,
-
-            total: response.usage?.total_tokens ?? 0,
-        },
-    });
+                total: response.usage?.total_tokens ?? 0,
+            },
+        });
+    }
+    catch (error) {
+        throw normalizeAIError(error, { provider: options.provider });
+    }
 
 };
 
@@ -71,72 +72,89 @@ const generateStream = async (
     options = {}
 ) => {
 
-    const messages = buildGroqMessages(
-        conversation,
-        options.systemPrompt
-    );
+    try {
 
-    const stream = await client.chat.completions.create({
-        model: options.model,
+        // build the messages
+        const messages = buildGroqMessages(
+            conversation,
+            options.systemPrompt
+        );
 
-        messages,
+        // generate the stream
+        const stream = await client.chat.completions.create({
 
-        temperature: options.temperature,
+            model: options.model,
 
-        max_completion_tokens: options.maxOutputTokens,
+            messages,
 
-        top_p: options.topP,
+            temperature: options.temperature,
 
-        stream: true,
+            max_completion_tokens: options.maxOutputTokens,
 
-        stream_options: {
-            include_usage: true,
-        },
-    });
+            top_p: options.topP,
 
-    return (async function* () {
+            stream: true,
 
-        let finalUsage = null;
-        let finalFinishReason = null;
-
-        for await (const chunk of stream) {
-
-            const choice = chunk.choices?.[0];
-
-            const content =
-                choice?.delta?.content ?? "";
-
-            if (content) {
-                yield createTokenEvent(content);
-            }
-
-            if (choice?.finish_reason) {
-                finalFinishReason =
-                    choice.finish_reason;
-            }
-
-            if (chunk.usage) {
-                finalUsage = {
-                    prompt:
-                        chunk.usage.prompt_tokens ?? 0,
-
-                    completion:
-                        chunk.usage.completion_tokens ?? 0,
-
-                    total:
-                        chunk.usage.total_tokens ?? 0,
-                };
-            }
-        }
-
-        yield createDoneEvent({
-            finishReason: finalFinishReason,
-            usage: finalUsage,
+            stream_options: {
+                include_usage: true,
+            },
         });
 
-    })();
-};
+        // return the stream
+        return (async function* () {
 
+            let finalUsage = null;
+            let finalFinishReason = null;
+
+            try {
+
+                for await (const chunk of stream) {
+
+                    const choice = chunk.choices?.[0];
+
+                    const content =
+                        choice?.delta?.content ?? "";
+
+                    if (content) {
+                        yield createTokenEvent(content);
+                    }
+
+                    if (choice?.finish_reason) {
+                        finalFinishReason =
+                            choice.finish_reason;
+                    }
+
+                    if (chunk.usage) {
+                        finalUsage = {
+                            prompt:
+                                chunk.usage.prompt_tokens ?? 0,
+
+                            completion:
+                                chunk.usage.completion_tokens ?? 0,
+
+                            total:
+                                chunk.usage.total_tokens ?? 0,
+                        };
+                    }
+                }
+
+                // send the final event
+                yield createDoneEvent({
+                    finishReason: finalFinishReason,
+                    usage: finalUsage,
+                });
+
+            }
+            catch (error) {
+                throw normalizeAIError(error, { provider: options.provider });
+            }
+
+        })();
+    }
+    catch (error) {
+        throw normalizeAIError(error, { provider: options.provider });
+    }
+};
 
 export const groqProvider = createAIProviderContract({
     generateResponse,
