@@ -5,6 +5,8 @@ import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { generateChatTitle } from "../../shared/utils/titleGenerator.js";
 import { QueryBuilder } from "../../shared/utils/queryBuilder.js";
 
+const SUMMARY_INTERVAL = 20000;
+
 const createChat = async (userId, data) => {
 
     const provider = data.provider || DEFAULT_PROVIDER;
@@ -192,30 +194,45 @@ const incrementTokenUsage = async (
 
 const updateSummary = async (
     chatId,
-    summary
+    summary,
+    tokenUsage
 ) => {
 
     return chatRepository.updateSummary(
         chatId,
-        summary
+        summary,
+        tokenUsage
     );
 
 };
 
 const shouldGenerateSummary = async (chatId) => {
 
-    const chat =
-        await chatRepository.findById(chatId);
+    const chat = await chatRepository.findById(chatId);
 
     if (!chat) {
         return false;
     }
 
-    return (
-        chat.tokenUsage.total >=
-        AI_CONTEXT.SUMMARY_THRESHOLD
-    );
+    const totalTokens = chat.tokenUsage?.total ?? 0;
 
+    const summaryTokens = chat.summary?.tokenUsage ?? 0;
+
+    // First summary
+    if (!chat.summary?.updatedAt) {
+
+        return (
+            totalTokens >=
+            AI_CONTEXT.SUMMARY_THRESHOLD
+        );
+
+    }
+
+    // Subsequent summaries
+    return (
+        totalTokens >=
+        summaryTokens + SUMMARY_INTERVAL
+    );
 };
 
 export const chatService = {

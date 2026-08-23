@@ -77,15 +77,30 @@ const messageSchema = new mongoose.Schema({
 
         latency: {
             type: Number,
-            default: null
+            default: null,
         },
 
         safety: {
             type: mongoose.Schema.Types.Mixed,
-            default: null
+            default: null,
         },
 
+        error: {
+            code: {
+                type: String,
+                default: null,
+            },
 
+            message: {
+                type: String,
+                default: null,
+            },
+
+            retryable: {
+                type: Boolean,
+                default: false,
+            },
+        },
     },
 
 }, {

@@ -12,21 +12,27 @@ const truncateToTokenBudget = (
 };
 
 const getMessageTokens = (message) => {
-    const storedTokens = message.tokenUsage?.total ?? 0;
-    const contentTokens = estimateTokens(message.content ?? "");
-
-    return Math.max(storedTokens, contentTokens);
+    return estimateTokens(message.content ?? "");
 };
 
 const buildContextWindow = (
-    history,
+    history = [],
     summary = "",
     maxTokens = AI_CONTEXT.MAX_CONTEXT_TOKENS
 ) => {
 
-    let totalTokens = 0;
-
     const selected = [];
+
+    const summaryText = summary?.trim()
+        ? `Conversation Summary:\n\n${summary.trim()}`
+        : "";
+
+    const summaryTokens = estimateTokens(summaryText);
+
+    let remainingTokens = Math.max(
+        maxTokens - summaryTokens,
+        0
+    );
 
     for (let i = history.length - 1; i >= 0; i--) {
 
@@ -34,21 +40,19 @@ const buildContextWindow = (
 
         const tokens = getMessageTokens(message);
 
-        if (
-            totalTokens + tokens >
-            maxTokens
-        ) {
-            if (selected.length === 0) {
+        if (tokens > remainingTokens) {
+
+            if (selected.length === 0 && remainingTokens > 0) {
+
                 selected.unshift({
-                    role: message.role,
+                    ...message,
+
                     content: truncateToTokenBudget(
                         message.content ?? "",
-                        maxTokens
+                        remainingTokens
                     ),
+
                     attachments: message.attachments || [],
-                    tokenUsage: {
-                        total: maxTokens,
-                    },
                 });
             }
 
@@ -57,36 +61,27 @@ const buildContextWindow = (
 
         selected.unshift(message);
 
-        totalTokens += tokens;
-
+        remainingTokens -= tokens;
     }
 
     const context = [];
 
-    if (summary) {
+    if (summaryText) {
 
         context.push({
 
             role: "SYSTEM",
 
-            content: `Conversation Summary:
-
-${summary}`,
+            content: summaryText,
 
             attachments: [],
 
-            tokenUsage: {
-                total: 0,
-            },
-
         });
-
     }
 
     context.push(...selected);
 
     return context;
-
 };
 
 export {

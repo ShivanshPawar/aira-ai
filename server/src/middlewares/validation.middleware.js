@@ -1,6 +1,6 @@
 import { ZodError } from "zod";
 import { ApiResponse } from "../shared/responses/ApiResponse.js";
-import { HTTP_STATUS } from './../shared/constants/httpStatus.js';
+import { HTTP_STATUS } from "../shared/constants/httpStatus.js";
 
 export const validate = (schema) => {
     return async (req, res, next) => {
@@ -10,8 +10,11 @@ export const validate = (schema) => {
                 params: req.params,
                 query: req.query,
             });
-            next();
+
+            return next();
+
         } catch (error) {
+
             if (error instanceof ZodError) {
                 return ApiResponse.error(
                     res,
@@ -21,9 +24,10 @@ export const validate = (schema) => {
                         field: issue.path.join("."),
                         message: issue.message,
                     }))
-                )
+                );
             }
-            next(error);
+
+            return next(error);
         }
-    }
-}
+    };
+};

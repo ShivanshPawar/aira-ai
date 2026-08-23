@@ -60,7 +60,7 @@ export const editMessage = asyncHandler(async (req, res) => {
 
 export const getMessages = asyncHandler(async (req, res) => {
 
-    const messages = await messageService.getMessagesbyChat(
+    const messages = await messageService.getMessagesByChat(
         req.auth.userId,
         req.params.chatId
     );
@@ -89,12 +89,6 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 
 export const streamMessage = async (req, res) => {
 
-    console.log("=== STREAM CONTROLLER ===");
-
-    console.log("BODY:", req.body);
-    console.log("CHAT ID:", req.body.chatId);
-    console.log("CONTENT:", req.body.content);
-    console.log("AUTH:", req.auth);
     // SSE Headers (Server-Sent Events)
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -106,9 +100,7 @@ export const streamMessage = async (req, res) => {
         req.auth.userId,
         req.body.chatId,
         req.body.content,
-
         {
-
             onToken(text) {
                 res.write(
                     `data: ${JSON.stringify({
@@ -140,7 +132,7 @@ export const streamMessage = async (req, res) => {
                 res.end();
             },
         },
-
+        req.body.attachments
     );
 
 };

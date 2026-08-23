@@ -11,7 +11,7 @@ router.use(protect);
 
 router.post("/", validate(sendMessageSchema), sendMessage);
 
-router.post("/:messageId/regenerate", regenerateResponse);
+router.post("/:messageId/regenerate",validate(sendMessageSchema), regenerateResponse);
 
 router.put("/:messageId",validate(sendMessageSchema),editMessage);
 

@@ -87,6 +87,11 @@ const chatSchema = new mongoose.Schema({
             type: Date,
             default: null,
         },
+
+        tokenUsage: {
+            type: Number,
+            default: 0,
+        },
     },
 
 }, {

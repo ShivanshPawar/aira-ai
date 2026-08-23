@@ -4,6 +4,7 @@ import { storageService } from "../../services/storage/storage.service.js";
 import { fileRepository } from "./file.repository.js";
 import { FILE_PROVIDER, FILE_STATUS, FILE_TYPES } from "./file.constants.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
+import { ApiError } from "../../shared/errors/ApiError.js";
 
 const getFileType = (mimeType) => {
 

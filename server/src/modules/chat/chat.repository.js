@@ -18,43 +18,52 @@ const findChats = async ({
     return Chat.find(filters)
         .sort(sort)
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .lean();
 
 };
 
-const countChats = async(filters) => {
+const countChats = async (filters) => {
     return Chat.countDocuments(filters);
-}
+};
 
 const updateById = async (chatId, data) => {
+
     return Chat.findByIdAndUpdate(
         chatId,
         data,
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true,
         }
     );
+
 };
 
 const deleteById = async (chatId) => {
     return Chat.findByIdAndDelete(chatId);
 };
 
-const updateChatActivity = async (chatId, lastMessageId) => {
+const updateChatActivity = async (
+    chatId,
+    lastMessageId
+) => {
+
     return Chat.findByIdAndUpdate(
         chatId,
         {
             lastMessage: lastMessageId,
             lastMessageAt: new Date(),
+
             $inc: {
                 messageCount: 1,
             },
         },
         {
-            new: true,
+            returnDocument: "after",
         }
     );
+
 };
 
 const incrementTokenUsage = async (
@@ -66,13 +75,13 @@ const incrementTokenUsage = async (
         chatId,
         {
             $inc: {
-                "tokenUsage.prompt": usage.prompt,
-                "tokenUsage.completion": usage.completion,
-                "tokenUsage.total": usage.total,
+                "tokenUsage.prompt": usage.prompt ?? 0,
+                "tokenUsage.completion": usage.completion ?? 0,
+                "tokenUsage.total": usage.total ?? 0,
             },
         },
         {
-            new: true,
+            returnDocument: "after",
         }
     );
 
@@ -80,7 +89,8 @@ const incrementTokenUsage = async (
 
 const updateSummary = async (
     chatId,
-    summary
+    summary,
+    tokenUsage
 ) => {
 
     return Chat.findByIdAndUpdate(
@@ -89,10 +99,11 @@ const updateSummary = async (
             summary: {
                 content: summary,
                 updatedAt: new Date(),
+                tokenUsage,
             },
         },
         {
-            new: true,
+            returnDocument: "after",
         }
     );
 

@@ -6,7 +6,7 @@ const createMessage = async (messageData) => {
 };
 
 const findMessageById = async (messageId) => {
-    return Message.findById(messageId);
+    return Message.findById(messageId).lean();
 };
 
 const findMessagesByChat = async (chatId) => {
@@ -16,7 +16,8 @@ const findMessagesByChat = async (chatId) => {
         .populate("attachments")
         .sort({
             createdAt: 1,
-        });;
+        })
+        .lean();
 };
 
 
@@ -25,7 +26,8 @@ const findLastMessageByChat = async (chatId) => {
         chat: chatId,
     }).sort({
         createdAt: -1,
-    });
+    })
+    .lean();
 };
 
 
@@ -43,7 +45,8 @@ const findPreviousUserMessage = async (
         },
     }).sort({
         createdAt: -1,
-    });
+    })
+    .lean();
 };
 
 const deleteMessagesAfter = async (
