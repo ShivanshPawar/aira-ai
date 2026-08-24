@@ -5,7 +5,8 @@ export const MESSAGE_ROLES = {
 };
 
 export const MESSAGE_STATUS = {
-    PENDING: "PENDING",
+    GENERATING: "GENERATING",
     COMPLETED: "COMPLETED",
     FAILED: "FAILED",
+    CANCELLED: "CANCELLED",
 };

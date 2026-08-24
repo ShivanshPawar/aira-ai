@@ -1,6 +1,6 @@
 import { chatService } from "../chat/chat.service.js";
 import { messageRepository } from "./message.repository.js";
-import { MESSAGE_ROLES } from "../../shared/constants/message.js";
+import { MESSAGE_ROLES, MESSAGE_STATUS } from "../../shared/constants/message.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { aiService } from "../ai/ai.service.js";
@@ -391,17 +391,15 @@ const streamMessage = async (
 ) => {
 
     const {
-
         onToken = () => { },
-
         onComplete = () => { },
-
         onError = () => { },
-
     } = callbacks;
 
+    let assistantMessage = null;
 
     try {
+
         // Verify chat access
         const chat = await chatService.verifyChatAccess(
             chatId,
@@ -410,37 +408,62 @@ const streamMessage = async (
 
         // Save user message
         const userMessage = await messageRepository.createMessage({
-
             chat: chatId,
-
             user: userId,
-
             role: MESSAGE_ROLES.USER,
-
             content,
-
             attachments,
-
         });
 
-        // Update activity
-        await chatService.updateChatActivity(
-            chatId,
-            userMessage._id
-        );
+        // Create assistant placeholder
+        assistantMessage = await messageRepository.createMessage({
+            chat: chatId,
+            user: userId,
+            role: MESSAGE_ROLES.ASSISTANT,
+            content: "",
+            provider: chat.provider ?? DEFAULT_PROVIDER,
+            model: chat.model ?? DEFAULT_MODEL,
+            status: MESSAGE_STATUS.GENERATING,
+            tokenUsage: {
+                prompt: 0,
+                completion: 0,
+                total: 0,
+            },
+            metadata: {
+                finishReason: null,
+                latency: null,
+            },
+        });
+
+        // Resolve AI configuration
+        const provider = chat.provider ?? DEFAULT_PROVIDER;
+
+        const model = chat.model ?? DEFAULT_MODEL;
+
+        const systemPrompt = chat.systemPrompt ?? undefined;
+
+        const aiOptions = {
+            provider,
+            model,
+            systemPrompt,
+        };
 
         // Get conversation history
         const history = await messageRepository.findMessagesByChat(
             chatId
         );
 
-        // Resolve AI configuration
-        const aiOptions = resolveAIOptions(chat);
+        // Resolve context window
+        const maxContextTokens =
+            provider === AI_PROVIDERS.GROQ
+                ? AI_CONTEXT.GROQ_CONTEXT_TOKENS
+                : AI_CONTEXT.MAX_CONTEXT_TOKENS;
 
         // Build AI conversation
-        const conversation = buildAIConversation(
+        const conversation = buildConversation(
             history,
-            chat
+            chat.summary?.content ?? "",
+            maxContextTokens
         );
 
         // Start AI stream
@@ -449,14 +472,13 @@ const streamMessage = async (
             aiOptions
         );
 
-        // Stream state
         let assistantText = "";
-
         let finishReason = null;
-
         let usage = null;
 
-        // Consume normalized AI stream
+        const startedAt = Date.now();
+
+        // Consume normalized stream
         for await (const event of stream) {
 
             // TOKEN
@@ -473,7 +495,6 @@ const streamMessage = async (
                 onToken(text);
 
                 continue;
-
             }
 
             // DONE
@@ -484,60 +505,58 @@ const streamMessage = async (
                 usage = event.usage ?? null;
 
                 continue;
-
             }
 
             // ERROR
             if (event.type === "error") {
 
-                throw new ApiError(
-                    HTTP_STATUS.BAD_GATEWAY,
+                throw new Error(
                     event.error?.message ??
                     event.error ??
-                    "AI stream failed."
+                    "AI stream failed"
                 );
-
             }
-
         }
 
         // Normalize token usage
         const tokenUsage = {
-
             prompt: usage?.prompt ?? 0,
-
             completion: usage?.completion ?? 0,
-
             total: usage?.total ?? 0,
-
         };
 
-        // Save assistant message
-        const assistantMessage = await messageRepository.createMessage({
+        // Validate generated content
+        if (!assistantText.trim()) {
 
-            chat: chatId,
+            throw new ApiError(
+                HTTP_STATUS.BAD_GATEWAY,
+                "AI provider returned an empty response."
+            );
+        }
 
-            user: userId,
+        // Calculate latency
+        const latency = Date.now() - startedAt;
 
-            role: MESSAGE_ROLES.ASSISTANT,
+        // Complete assistant message
+        assistantMessage = await messageRepository.updateMessage(
+            assistantMessage._id,
+            {
+                content: assistantText,
+                status: MESSAGE_STATUS.COMPLETED,
 
-            content: assistantText,
+                provider,
+                model,
 
-            provider: aiOptions.provider,
+                tokenUsage,
 
-            model: aiOptions.model,
+                metadata: {
+                    finishReason,
+                    latency,
+                },
+            }
+        );
 
-            tokenUsage,
-
-            metadata: {
-
-                finishReason,
-
-            },
-
-        });
-
-        // Update token usage
+        // Update chat token usage
         await chatService.incrementTokenUsage(
             chatId,
             tokenUsage
@@ -549,51 +568,52 @@ const streamMessage = async (
             assistantMessage._id
         );
 
-        // Update title
+        // Update chat title
         await chatService.updateChatTitle(
             chatId,
             content
         );
 
-        // Summary check
-        const shouldSummarize = await chatService.shouldGenerateSummary(
-            chatId
-        );
-
-
-        if (shouldSummarize) {
-
-            generateConversationSummary(
-                chatId,
-                aiOptions
-            ).catch((error) => {
-
-                console.error(
-                    "Failed to generate conversation summary:",
-                    error
-                );
-
-            });
-
-        }
-
         // Notify controller
         await onComplete({
             assistantMessage,
+            userMessage,
         });
-
 
         return assistantMessage;
 
-
     } catch (error) {
+
+        // Mark assistant generation as failed
+        if (assistantMessage?._id) {
+
+            try {
+
+                await messageRepository.updateMessage(
+                    assistantMessage._id,
+                    {
+                        status: MESSAGE_STATUS.FAILED,
+
+                        metadata: {
+                            finishReason: "error",
+                            error: error.message,
+                        },
+                    }
+                );
+
+            } catch (updateError) {
+
+                console.error(
+                    "Failed to update assistant message status:",
+                    updateError
+                );
+            }
+        }
 
         await onError(error);
 
         throw error;
-
     }
-
 };
 
 
