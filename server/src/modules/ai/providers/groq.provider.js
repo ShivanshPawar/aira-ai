@@ -81,24 +81,26 @@ const generateStream = async (
         );
 
         // generate the stream
-        const stream = await client.chat.completions.create({
-
+        const request = {
             model: options.model,
-
             messages,
-
             temperature: options.temperature,
-
             max_completion_tokens: options.maxOutputTokens,
-
             top_p: options.topP,
-
             stream: true,
-
             stream_options: {
                 include_usage: true,
             },
-        });
+        };
+
+        const stream = await client.chat.completions.create(
+            request,
+            options.signal
+                ? {
+                    signal: options.signal,
+                }
+                : undefined
+        );
 
         // return the stream
         return (async function* () {

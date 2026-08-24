@@ -13,6 +13,7 @@ import {
 import { buildConversation } from "../ai/conversation.builder.js";
 import { summaryService } from "../ai/services/summary.service.js";
 import { chatRepository } from "../chat/chat.repository.js";
+import { AICancelledError } from "../ai/errors/ai-cancelled.error.js";
 
 
 // Helpers
@@ -387,7 +388,8 @@ const streamMessage = async (
     chatId,
     content,
     callbacks = {},
-    attachments = []
+    attachments = [],
+    signal = null
 ) => {
 
     const {
@@ -397,6 +399,7 @@ const streamMessage = async (
     } = callbacks;
 
     let assistantMessage = null;
+    let assistantText = "";
 
     try {
 
@@ -435,6 +438,12 @@ const streamMessage = async (
             },
         });
 
+        // Check cancellation before AI call
+
+        if (signal?.aborted) {
+            throw new AICancelledError();
+        }
+
         // Resolve AI configuration
         const provider = chat.provider ?? DEFAULT_PROVIDER;
 
@@ -446,6 +455,7 @@ const streamMessage = async (
             provider,
             model,
             systemPrompt,
+            signal
         };
 
         // Get conversation history
@@ -472,7 +482,6 @@ const streamMessage = async (
             aiOptions
         );
 
-        let assistantText = "";
         let finishReason = null;
         let usage = null;
 
@@ -480,6 +489,11 @@ const streamMessage = async (
 
         // Consume normalized stream
         for await (const event of stream) {
+
+            // Check cancellation
+            if (signal?.aborted) {
+                throw new AICancelledError();
+            }
 
             // TOKEN
             if (event.type === "token") {
@@ -552,6 +566,7 @@ const streamMessage = async (
                 metadata: {
                     finishReason,
                     latency,
+                    error: null,
                 },
             }
         );
@@ -583,6 +598,34 @@ const streamMessage = async (
         return assistantMessage;
 
     } catch (error) {
+
+        // Cancellation
+        if (error instanceof AICancelledError || signal?.aborted) {
+            if (assistantMessage?._id) {
+
+                // Mark assistant generation as failed
+                assistantMessage = await messageRepository.updateMessage(
+                    assistantMessage._id,
+                    {
+                        content: assistantText,
+
+                        status: MESSAGE_STATUS.CANCELLED,
+
+                        metadata: {
+                            finishReason: "canceled",
+                            latency: null,
+                            error: "AI generation was cancelled",
+                        },
+                    }
+                );
+            }
+
+            await onError(
+                new AICancelledError()
+            );
+
+            throw new AICancelledError();
+        }
 
         // Mark assistant generation as failed
         if (assistantMessage?._id) {

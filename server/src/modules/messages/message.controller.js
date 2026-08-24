@@ -89,6 +89,22 @@ export const deleteMessage = asyncHandler(async (req, res) => {
 
 export const streamMessage = async (req, res) => {
 
+    const controller = new AbortController();
+
+    const abortGeneration = () => {
+        if (!controller.signal.aborted) {
+            controller.abort();
+        }
+    };
+
+    res.on("aborted", abortGeneration);
+
+    res.on("close", () => {
+        if (!res.witableEnded) {
+            abortGeneration();
+        }
+    });
+
     // SSE Headers (Server-Sent Events)
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -96,43 +112,75 @@ export const streamMessage = async (req, res) => {
     // Optional flushHeaders
     res.flushHeaders?.();
 
-    await messageService.streamMessage(
-        req.auth.userId,
-        req.body.chatId,
-        req.body.content,
-        {
-            onToken(text) {
-                res.write(
-                    `data: ${JSON.stringify({
-                        type: "chunk",
-                        content: text,
-                    })}\n\n`
-                );
+    try {
+
+        await messageService.streamMessage(
+            req.auth.userId,
+            req.body.chatId,
+            req.body.content,
+            {
+                onToken(text) {
+
+                    if (
+                        controller.signal.aborted || res.writableEnded
+                    ) {
+                        return;
+                    }
+
+                    res.write(
+                        `data: ${JSON.stringify({
+                            type: "chunk",
+                            content: text,
+                        })}\n\n`
+                    );
+                },
+
+                onComplete({ assistantMessage }) {
+
+                    if (
+                        controller.signal.aborted || res.writableEnded
+                    ) {
+                        return;
+                    }
+
+                    res.write(
+                        `data: ${JSON.stringify({
+                            type: "done",
+                            messageId: assistantMessage._id,
+                        })}\n\n`
+                    );
+
+                    res.end();
+                },
+
+                onError(error) {
+
+                    if (
+                        controller.signal.aborted || res.writableEnded
+                    ) {
+                        return;
+                    }
+
+                    res.write(
+                        `data: ${JSON.stringify({
+                            type: "error",
+                            message: error.message,
+                        })}\n\n`
+                    );
+
+                    res.end();
+                },
             },
+            req.body.attachments,
+            controller.signal
+        );
 
-            onComplete({ assistantMessage }) {
-                res.write(
-                    `data: ${JSON.stringify({
-                        type: "done",
-                        messageId: assistantMessage._id,
-                    })}\n\n`
-                );
-
-                res.end();
-            },
-
-            onError(error) {
-                res.write(
-                    `data: ${JSON.stringify({
-                        type: "error",
-                        message: error.message,
-                    })}\n\n`
-                );
-
-                res.end();
-            },
-        },
-        req.body.attachments
-    );
-
+    } catch (error) {
+        if (
+            controller.signal.aborted || res.witableEnded
+        ) {
+            return;
+        }
+        res.end();
+    }
 };
