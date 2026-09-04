@@ -49,7 +49,7 @@ const messageSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: Object.values(MESSAGE_STATUS),
-        default: MESSAGE_STATUS.COMPLETED,
+        default: MESSAGE_STATUS.GENERATING,
     },
 
     tokenUsage: {

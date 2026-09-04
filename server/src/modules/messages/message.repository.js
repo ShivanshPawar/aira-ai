@@ -20,16 +20,14 @@ const findMessagesByChat = async (chatId) => {
         .lean();
 };
 
-
 const findLastMessageByChat = async (chatId) => {
     return Message.findOne({
         chat: chatId,
     }).sort({
         createdAt: -1,
     })
-    .lean();
+        .lean();
 };
-
 
 const findPreviousUserMessage = async (
     chatId,
@@ -46,7 +44,7 @@ const findPreviousUserMessage = async (
     }).sort({
         createdAt: -1,
     })
-    .lean();
+        .lean();
 };
 
 const deleteMessagesAfter = async (
@@ -63,8 +61,6 @@ const deleteMessagesAfter = async (
 
 };
 
-
-
 const updateMessage = async (messageId, data) => {
     return Message.findByIdAndUpdate(
         messageId,
@@ -80,6 +76,27 @@ const deleteMessage = async (messageId) => {
     return Message.findByIdAndDelete(messageId);
 };
 
+const updateMessageStatus = async (
+    messageId,
+    status,
+    data = {}
+) => {
+
+    return Message.findByIdAndUpdate(
+        messageId,
+        {
+            $set: {
+                status,
+                ...data,
+            },
+        },
+        {
+            returnDocument: "after",
+            runValidators: true,
+        }
+    ).lean();
+};
+
 
 
 export const messageRepository = {
@@ -91,4 +108,5 @@ export const messageRepository = {
     findLastMessageByChat,
     findPreviousUserMessage,
     deleteMessagesAfter,
+    updateMessageStatus
 };

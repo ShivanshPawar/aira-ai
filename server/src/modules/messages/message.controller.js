@@ -41,13 +41,12 @@ export const regenerateResponse = asyncHandler(async (req, res) => {
 
 export const editMessage = asyncHandler(async (req, res) => {
 
-    const response =
-        await messageService.editMessage(
-            req.auth.userId,
-            req.params.messageId,
-            req.body.content,
-            req.body.attachments
-        );
+    const response = await messageService.editMessage(
+        req.auth.userId,
+        req.params.messageId,
+        req.body.content,
+        req.body.attachments
+    );
 
     return ApiResponse.success(
         res,
@@ -100,7 +99,7 @@ export const streamMessage = async (req, res) => {
     res.on("aborted", abortGeneration);
 
     res.on("close", () => {
-        if (!res.witableEnded) {
+        if (!res.writableEnded) {
             abortGeneration();
         }
     });
@@ -177,7 +176,7 @@ export const streamMessage = async (req, res) => {
 
     } catch (error) {
         if (
-            controller.signal.aborted || res.witableEnded
+            controller.signal.aborted || res.writableEnded
         ) {
             return;
         }
