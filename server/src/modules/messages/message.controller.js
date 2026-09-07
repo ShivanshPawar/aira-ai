@@ -183,3 +183,118 @@ export const streamMessage = async (req, res) => {
         res.end();
     }
 };
+
+export const retryStreamMessage = async (req, res) => {
+
+    const controller = new AbortController();
+
+    const abortGeneration = () => {
+        if (!controller.signal.aborted) {
+            console.log("=== CLIENT DISCONNECTED ===");
+            controller.abort();
+        }
+    };
+
+    // Detect client disconnect
+    res.on("aborted", abortGeneration);
+
+    res.on("close", () => {
+        if (!res.writableEnded) {
+            abortGeneration();
+        }
+    });
+
+    // SSE headers
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    res.flushHeaders?.();
+
+    try {
+
+        await messageService.retryStreamMessage(
+            req.auth.userId,
+            req.params.messageId,
+            {
+                onToken(text) {
+
+                    if (
+                        controller.signal.aborted ||
+                        res.writableEnded
+                    ) {
+                        return;
+                    }
+
+                    res.write(
+                        `data: ${JSON.stringify({
+                            type: "chunk",
+                            content: text,
+                        })}\n\n`
+                    );
+                },
+
+                onComplete({ assistantMessage }) {
+
+                    if (
+                        controller.signal.aborted ||
+                        res.writableEnded
+                    ) {
+                        return;
+                    }
+
+                    res.write(
+                        `data: ${JSON.stringify({
+                            type: "done",
+                            messageId: assistantMessage._id,
+                        })}\n\n`
+                    );
+
+                    res.end();
+                },
+
+                onError(error) {
+
+                    if (
+                        controller.signal.aborted ||
+                        res.writableEnded
+                    ) {
+                        return;
+                    }
+
+                    res.write(
+                        `data: ${JSON.stringify({
+                            type: "error",
+                            message: error.message,
+                        })}\n\n`
+                    );
+
+                    res.end();
+                },
+            },
+            controller.signal
+        );
+
+    } catch (error) {
+
+        console.error("=== RETRY STREAM ERROR ===");
+        console.error(error);
+
+        if (
+            controller.signal.aborted ||
+            res.writableEnded
+        ) {
+            return;
+        }
+
+        res.write(
+            `data: ${JSON.stringify({
+                type: "error",
+                message: error.message,
+                code: error.code ?? "UNKNOWN_ERROR",
+            })}\n\n`
+        );
+
+        res.end();
+    }
+};

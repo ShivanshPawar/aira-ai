@@ -367,45 +367,42 @@ const editMessage = async (
 };
 
 
-// Stream Message
-const streamMessage = async (
+// Generate Assistant Stream
+const generateAssistantStream = async (
     userId,
     chatId,
-    content,
     callbacks = {},
-    attachments = [],
-    signal = null
+    signal = null,
+    options = {}
 ) => {
+
     const {
         onToken = () => { },
         onComplete = () => { },
         onError = () => { },
     } = callbacks;
 
+    const {
+        contentForTitle = null,
+    } = options;
+
     let assistantMessage = null;
     let assistantText = "";
     const startedAt = Date.now();
 
     try {
-        //  Verify chat access
+
+        // Verify chat access
         const chat = await chatService.verifyChatAccess(
             chatId,
             userId
         );
 
-        // Save USER message
-        const userMessage = await messageRepository.createMessage({
-            chat: chatId,
-            user: userId,
-            role: MESSAGE_ROLES.USER,
-            content,
-            attachments,
-            status: MESSAGE_STATUS.COMPLETED,
-        });
-
         // Resolve AI configuration
         const provider = chat.provider ?? DEFAULT_PROVIDER;
+
         const model = chat.model ?? DEFAULT_MODEL;
+
         const systemPrompt = chat.systemPrompt ?? undefined;
 
         const aiOptions = {
@@ -422,7 +419,19 @@ const streamMessage = async (
                 : AI_CONTEXT.MAX_CONTEXT_TOKENS;
 
         // Get conversation history
-        const history = await messageRepository.findMessagesByChat(chatId);
+        let history = await messageRepository.findMessagesByChat(chatId);
+
+        // Remove the target failed/cancelled
+        // assistant when retrying.
+        if (options.excludeMessageId) {
+
+            history = history.filter(
+                (message) =>
+                    message._id.toString() !==
+                    options.excludeMessageId.toString()
+            );
+
+        }
 
         // Build AI conversation
         const conversation = buildConversation(
@@ -431,7 +440,7 @@ const streamMessage = async (
             maxContextTokens
         );
 
-        // Create ASSISTANT message first
+        // Create new assistant message
         assistantMessage = await messageRepository.createMessage({
             chat: chatId,
             user: userId,
@@ -494,7 +503,7 @@ const streamMessage = async (
                 continue;
             }
 
-            // ERROR EVENT
+            // ERROR
             if (event.type === "error") {
 
                 throw new Error(
@@ -505,15 +514,12 @@ const streamMessage = async (
             }
         }
 
-        // IMPORTANT:
-        // Stream may finish after the client has
-        // already cancelled.
-
+        // Important race-condition check
         if (signal?.aborted) {
             throw new AICancelledError();
         }
 
-        // 10. Normalize token usage
+        // Normalize token usage
         const tokenUsage = {
             prompt: usage?.prompt ?? 0,
             completion: usage?.completion ?? 0,
@@ -523,23 +529,22 @@ const streamMessage = async (
         // Calculate latency
         const latency = Date.now() - startedAt;
 
-        // Mark assistant COMPLETED
-        assistantMessage =
-            await messageRepository.updateMessage(
-                assistantMessage._id,
-                {
-                    content: assistantText,
+        // Mark COMPLETED
+        assistantMessage = await messageRepository.updateMessage(
+            assistantMessage._id,
+            {
+                content: assistantText,
 
-                    status: MESSAGE_STATUS.COMPLETED,
+                status: MESSAGE_STATUS.COMPLETED,
 
-                    tokenUsage,
+                tokenUsage,
 
-                    metadata: {
-                        finishReason,
-                        latency,
-                    },
-                }
-            );
+                metadata: {
+                    finishReason,
+                    latency,
+                },
+            }
+        );
 
         // Update chat token usage
         await chatService.incrementTokenUsage(
@@ -553,19 +558,21 @@ const streamMessage = async (
             assistantMessage._id
         );
 
-        // Update chat title
-        await chatService.updateChatTitle(
-            chatId,
-            content
-        );
+        // Update chat title only when requested
+        if (contentForTitle) {
+
+            await chatService.updateChatTitle(
+                chatId,
+                contentForTitle
+            );
+
+        }
 
         // Notify controller
         await onComplete({
             assistantMessage,
-            userMessage,
         });
 
-        // Return assistant message
         return assistantMessage;
 
     } catch (error) {
@@ -573,38 +580,32 @@ const streamMessage = async (
         const latency = Date.now() - startedAt;
 
         // CANCELLATION
-
         if (
-            error instanceof AICancelledError ||
-            signal?.aborted
+            error instanceof AICancelledError || signal?.aborted
         ) {
 
             if (assistantMessage?._id) {
 
-                assistantMessage =
-                    await messageRepository.updateMessage(
-                        assistantMessage._id,
-                        {
-                            content: assistantText,
+                assistantMessage = await messageRepository.updateMessage(
+                    assistantMessage._id,
+                    {
+                        content: assistantText,
 
-                            status: MESSAGE_STATUS.CANCELLED,
+                        status: MESSAGE_STATUS.CANCELLED,
 
-                            metadata: {
-                                finishReason: "cancelled",
-                                latency,
-                                error: {
-                                    code: "AI_GENERATION_CANCELLED",
-                                    message:
-                                        "AI generation was cancelled.",
-                                    retryable: false,
-                                },
+                        metadata: {
+                            finishReason: "cancelled",
+                            latency,
+                            error: {
+                                code: "AI_GENERATION_CANCELLED",
+                                message: "AI generation was cancelled.",
+                                retryable: false,
                             },
-                        }
-                    );
+                        },
+                    }
+                );
             }
 
-            // Do not send a normal SSE error after
-            // the client has disconnected.
             if (!signal?.aborted) {
                 await onError(error);
             }
@@ -613,7 +614,6 @@ const streamMessage = async (
         }
 
         // PROVIDER / OTHER FAILURE
-
         if (assistantMessage?._id) {
 
             const normalizedError = {
@@ -624,27 +624,172 @@ const streamMessage = async (
                 retryable: error.retryable ?? false,
             };
 
-            assistantMessage =
-                await messageRepository.updateMessage(
-                    assistantMessage._id,
-                    {
-                        content: assistantText,
+            assistantMessage = await messageRepository.updateMessage(
+                assistantMessage._id,
+                {
+                    content: assistantText,
 
-                        status: MESSAGE_STATUS.FAILED,
+                    status: MESSAGE_STATUS.FAILED,
 
-                        metadata: {
-                            finishReason: "error",
-                            latency,
-                            error: normalizedError,
-                        },
-                    }
-                );
+                    metadata: {
+                        finishReason: "error",
+                        latency,
+                        error: normalizedError,
+                    },
+                }
+            );
         }
 
         await onError(error);
 
         throw error;
     }
+};
+
+
+// Stream Message
+const streamMessage = async (
+    userId,
+    chatId,
+    content,
+    callbacks = {},
+    attachments = [],
+    signal = null
+) => {
+
+    // Verify chat access
+    await chatService.verifyChatAccess(
+        chatId,
+        userId
+    );
+
+    // Save USER message
+    const userMessage = await messageRepository.createMessage({
+        chat: chatId,
+        user: userId,
+        role: MESSAGE_ROLES.USER,
+        content,
+        attachments,
+        status: MESSAGE_STATUS.COMPLETED,
+    });
+
+    // Update activity for user message
+    await chatService.updateChatActivity(
+        chatId,
+        userMessage._id
+    );
+
+    // Generate assistant response
+    const assistantMessage =
+        await generateAssistantStream(
+            userId,
+            chatId,
+            {
+                ...callbacks,
+
+                onComplete: async ({
+                    assistantMessage,
+                }) => {
+
+                    await callbacks.onComplete?.({
+                        assistantMessage,
+                        userMessage,
+                    });
+
+                },
+            },
+            signal,
+            {
+                contentForTitle: content,
+            }
+        );
+
+    return assistantMessage;
+};
+
+
+// Retry Failed / Cancelled Assistant Response
+const retryStreamMessage = async (
+    userId,
+    assistantMessageId,
+    callbacks = {},
+    signal = null
+) => {
+
+    // Get target assistant message
+    const assistantMessage = await getMessageById(
+        userId,
+        assistantMessageId
+    );
+
+    // Validate role
+    if (assistantMessage.role !== MESSAGE_ROLES.ASSISTANT) {
+
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Only assistant messages can be retried."
+        );
+
+    }
+
+    // Validate status
+    if (
+        assistantMessage.status !== MESSAGE_STATUS.FAILED
+        && assistantMessage.status !== MESSAGE_STATUS.CANCELLED
+    ) {
+
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Only failed or cancelled assistant messages can be retried."
+        );
+
+    }
+
+    // Ensure target is latest message
+    const lastMessage = await messageRepository.findLastMessageByChat(
+        assistantMessage.chat
+    );
+
+    if (!lastMessage || lastMessage._id.toString() !== assistantMessage._id.toString()) {
+
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Only the latest assistant response can be retried."
+        );
+
+    }
+
+    // Find original user message
+    const userMessage = await messageRepository.findPreviousUserMessage(
+        assistantMessage.chat,
+        assistantMessage.createdAt
+    );
+
+    if (!userMessage) {
+
+        throw new ApiError(
+            HTTP_STATUS.BAD_REQUEST,
+            "Previous user message not found."
+        );
+
+    }
+
+    // Generate a NEW assistant response
+    const newAssistantMessage = await generateAssistantStream(
+        userId,
+        assistantMessage.chat,
+        callbacks,
+        signal,
+        {
+            excludeMessageId:
+                assistantMessage._id,
+        }
+    );
+
+    return {
+        userMessage,
+        assistantMessage: newAssistantMessage,
+    };
 };
 
 
@@ -837,6 +982,7 @@ export const messageService = {
     regenerateResponse,
     editMessage,
     streamMessage,
+    retryStreamMessage,
     getMessagesByChat,
     getMessageById,
     deleteMessage,
