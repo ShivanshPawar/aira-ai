@@ -413,10 +413,9 @@ const generateAssistantStream = async (
         };
 
         // Resolve context window
-        const maxContextTokens =
-            provider === AI_PROVIDERS.GROQ
-                ? AI_CONTEXT.GROQ_CONTEXT_TOKENS
-                : AI_CONTEXT.MAX_CONTEXT_TOKENS;
+        const maxContextTokens = provider === AI_PROVIDERS.GROQ
+            ? AI_CONTEXT.GROQ_CONTEXT_TOKENS
+            : AI_CONTEXT.MAX_CONTEXT_TOKENS;
 
         // Get conversation history
         let history = await messageRepository.findMessagesByChat(chatId);
@@ -460,6 +459,12 @@ const generateAssistantStream = async (
                 safety: null,
             },
         });
+
+        // Update chat activity
+        await chatService.updateChatActivity(
+            chatId,
+            assistantMessage._id
+        );
 
         // Start AI stream
         const stream = await aiService.generateStream(
@@ -552,11 +557,6 @@ const generateAssistantStream = async (
             tokenUsage
         );
 
-        // Update chat activity
-        await chatService.updateChatActivity(
-            chatId,
-            assistantMessage._id
-        );
 
         // Update chat title only when requested
         if (contentForTitle) {
@@ -680,29 +680,28 @@ const streamMessage = async (
     );
 
     // Generate assistant response
-    const assistantMessage =
-        await generateAssistantStream(
-            userId,
-            chatId,
-            {
-                ...callbacks,
+    const assistantMessage = await generateAssistantStream(
+        userId,
+        chatId,
+        {
+            ...callbacks,
 
-                onComplete: async ({
+            onComplete: async ({
+                assistantMessage,
+            }) => {
+
+                await callbacks.onComplete?.({
                     assistantMessage,
-                }) => {
+                    userMessage,
+                });
 
-                    await callbacks.onComplete?.({
-                        assistantMessage,
-                        userMessage,
-                    });
-
-                },
             },
-            signal,
-            {
-                contentForTitle: content,
-            }
-        );
+        },
+        signal,
+        {
+            contentForTitle: content,
+        }
+    );
 
     return assistantMessage;
 };

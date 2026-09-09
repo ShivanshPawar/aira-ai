@@ -190,7 +190,6 @@ export const retryStreamMessage = async (req, res) => {
 
     const abortGeneration = () => {
         if (!controller.signal.aborted) {
-            console.log("=== CLIENT DISCONNECTED ===");
             controller.abort();
         }
     };
@@ -277,7 +276,6 @@ export const retryStreamMessage = async (req, res) => {
 
     } catch (error) {
 
-        console.error("=== RETRY STREAM ERROR ===");
         console.error(error);
 
         if (
