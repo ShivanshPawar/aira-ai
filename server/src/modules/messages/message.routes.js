@@ -11,9 +11,9 @@ router.use(protect);
 
 router.post("/", validate(sendMessageSchema), sendMessage);
 
-router.post("/:messageId/regenerate", validate(sendMessageSchema), regenerateResponse);
+router.post("/:messageId/regenerate", regenerateResponse);
 
-router.put("/:messageId", validate(sendMessageSchema), editMessage);
+router.put("/:messageId", editMessage);
 
 const streamMessageSchema = sendMessageSchema;
 

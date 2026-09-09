@@ -97,6 +97,23 @@ const updateMessageStatus = async (
     ).lean();
 };
 
+const countMessagesByChat = async (chatId) => {
+    return Message.countDocuments({
+        chat: chatId,
+    });
+};
+
+const findLatestMessageByChat = async (chatId) => {
+    return Message.findOne({
+        chat: chatId,
+    })
+        .sort({
+            createdAt: -1,
+            _id: -1,
+        })
+        .lean();
+};
+
 
 
 export const messageRepository = {
@@ -108,5 +125,7 @@ export const messageRepository = {
     findLastMessageByChat,
     findPreviousUserMessage,
     deleteMessagesAfter,
-    updateMessageStatus
+    updateMessageStatus,
+    countMessagesByChat,
+    findLatestMessageByChat,
 };

@@ -109,6 +109,26 @@ const updateSummary = async (
 
 };
 
+const syncMessageStats = async (
+    chatId,
+    messageCount,
+    lastMessage,
+    lastMessageAt
+) => {
+
+    return Chat.findByIdAndUpdate(
+        chatId,
+        {
+            messageCount,
+            lastMessage,
+            lastMessageAt,
+        },
+        {
+            returnDocument: "after",
+        }
+    );
+};
+
 export const chatRepository = {
     create,
     findById,
@@ -119,4 +139,5 @@ export const chatRepository = {
     updateChatActivity,
     incrementTokenUsage,
     updateSummary,
+    syncMessageStats,
 };

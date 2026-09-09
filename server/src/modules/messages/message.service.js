@@ -1,4 +1,5 @@
 import { chatService } from "../chat/chat.service.js";
+import { chatRepository } from "../chat/chat.repository.js";
 import { messageRepository } from "./message.repository.js";
 import { MESSAGE_ROLES, MESSAGE_STATUS } from "../../shared/constants/message.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
@@ -12,7 +13,6 @@ import {
 } from "../ai/ai.constants.js";
 import { buildConversation } from "../ai/conversation.builder.js";
 import { summaryService } from "../ai/services/summary.service.js";
-import { chatRepository } from "../chat/chat.repository.js";
 import { AICancelledError } from "../ai/errors/ai-cancelled.error.js";
 
 
@@ -286,6 +286,9 @@ const regenerateResponse = async (
         assistantMessage.chat
     );
 
+    await syncChatMessageStats(
+        assistantMessage.chat
+    );
 
     return {
 
@@ -340,16 +343,15 @@ const editMessage = async (
     );
 
 
-    // Update activity
-    await chatService.updateChatActivity(
-        userMessage.chat,
-        userMessage._id
-    );
-
-
     // Generate new assistant response
     const assistantMessage = await generateAssistantResponse(
         userId,
+        userMessage.chat
+    );
+
+
+    // Update stats
+    await syncChatMessageStats(
         userMessage.chat
     );
 
@@ -848,14 +850,23 @@ const deleteMessage = async (
     messageId
 ) => {
 
-    await getMessageById(
+    const message = await getMessageById(
         userId,
         messageId
     );
 
-    return messageRepository.deleteMessage(
-        messageId
-    );
+    const deletedMessage =
+        await messageRepository.deleteMessage(
+            messageId
+        );
+
+    if (deletedMessage) {
+        await syncChatMessageStats(
+            message.chat
+        );
+    }
+
+    return deletedMessage;
 };
 
 
@@ -973,6 +984,23 @@ const markMessageCancelled = async (
     );
 };
 
+const syncChatMessageStats = async (chatId) => {
+
+    const [
+        messageCount,
+        lastMessage,
+    ] = await Promise.all([
+        messageRepository.countMessagesByChat(chatId),
+        messageRepository.findLatestMessageByChat(chatId),
+    ]);
+
+    return chatRepository.syncMessageStats(
+        chatId,
+        messageCount,
+        lastMessage?._id ?? null,
+        lastMessage?.createdAt ?? null
+    );
+};
 
 // Exports
 export const messageService = {

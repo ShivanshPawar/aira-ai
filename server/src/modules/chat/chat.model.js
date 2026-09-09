@@ -45,8 +45,8 @@ const chatSchema = new mongoose.Schema({
 
     lastMessageAt: {
         type: Date,
-        default: Date.now,
-        index: true
+        default: null,
+        index: true,
     },
 
     lastMessage: {
