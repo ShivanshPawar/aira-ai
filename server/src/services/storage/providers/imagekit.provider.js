@@ -4,55 +4,56 @@ import { imagekit } from "../../../config/imagekit.js";
 
 export const imagekitProvider = {
 
-    async upload(file) {
+	async upload(file) {
 
-        const extension = path.extname(file.originalname);
+		const extension = path.extname(file.originalname);
 
-        const uniqueName =
-            `${Date.now()}-${Math.random()
-                .toString(36)
-                .substring(2)}${extension}`;
+		// Keep the extension for downstream type handling while avoiding name collisions in storage.
+		const uniqueName =
+			`${Date.now()}-${Math.random()
+				.toString(36)
+				.substring(2)}${extension}`;
 
-        const result = await imagekit.upload({
+		const result = await imagekit.upload({
 
-            file: file.buffer,
+			file: file.buffer,
 
-            fileName: uniqueName,
+			fileName: uniqueName,
 
-            folder: "/aira-ai",
+			folder: "/aira-ai",
 
-            useUniqueFileName: false,
+			useUniqueFileName: false,
 
-        });
+		});
 
-        return {
+		return {
 
-            provider: "IMAGEKIT",
+			provider: "IMAGEKIT",
 
-            providerFileId: result.fileId,
+			providerFileId: result.fileId,
 
-            url: result.url,
+			url: result.url,
 
-            thumbnailUrl: result.thumbnailUrl,
+			thumbnailUrl: result.thumbnailUrl,
 
-            originalName: file.originalname,
+			originalName: file.originalname,
 
-            fileName: uniqueName,
+			fileName: uniqueName,
 
-            mimeType: file.mimetype,
+			mimeType: file.mimetype,
 
-            extension,
+			extension,
 
-            size: file.size,
+			size: file.size,
 
-        };
+		};
 
-    },
+	},
 
-    async delete(fileId) {
+	async delete(fileId) {
 
-        await imagekit.deleteFile(fileId);
+		await imagekit.deleteFile(fileId);
 
-    },
+	},
 
 };

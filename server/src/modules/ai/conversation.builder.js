@@ -1,29 +1,30 @@
 import { buildContextWindow } from "./utils/context-window.js";
 
 export const buildConversation = (
-    history,
-    summary = "",
-    maxTokens
+	history,
+	summary = "",
+	maxTokens
 ) => {
 
-    const context = buildContextWindow(
-        history,
-        summary,
-        maxTokens
-    );
+	const context = buildContextWindow(
+		history,
+		summary,
+		maxTokens
+	);
 
-    return context.map((message) => ({
+	// Convert database role constants into the lower-case, provider-neutral message format.
+	return context.map((message) => ({
 
-        role: message.role === "USER" || message.role === "user"
-            ? "user"
-            : message.role === "ASSISTANT" || message.role === "assistant"
-                ? "assistant"
-                : "system",
+		role: message.role === "USER" || message.role === "user"
+			? "user"
+			: message.role === "ASSISTANT" || message.role === "assistant"
+				? "assistant"
+				: "system",
 
-        content: message.content,
+		content: message.content,
 
-        attachments: message.attachments || [],
+		attachments: message.attachments || [],
 
-    }));
+	}));
 
 };

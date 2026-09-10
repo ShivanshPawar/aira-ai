@@ -8,24 +8,24 @@
  */
 
 export const createAIProviderContract = ({
-    generateResponse,
-    generateStream,
+	generateResponse,
+	generateStream,
 }) => {
 
-    if (typeof generateResponse !== "function") {
-        throw new TypeError(
-            "AI provider must implement generateResponse()"
-        );
-    }
+	if (typeof generateResponse !== "function") {
+		throw new TypeError(
+			"AI provider must implement generateResponse()"
+		);
+	}
 
-    if (typeof generateStream !== "function") {
-        throw new TypeError(
-            "AI provider must implement generateStream()"
-        );
-    }
+	if (typeof generateStream !== "function") {
+		throw new TypeError(
+			"AI provider must implement generateStream()"
+		);
+	}
 
-    return {
-        generateResponse,
-        generateStream,
-    };
+	return {
+		generateResponse,
+		generateStream,
+	};
 };

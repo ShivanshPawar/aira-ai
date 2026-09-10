@@ -2,134 +2,137 @@ import { authRepository } from "./auth.repository.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
+	generateAccessToken,
+	generateRefreshToken,
+	verifyRefreshToken,
 } from "../../shared/utils/jwt.js";
 import { hashToken } from "../../shared/utils/crypto.js";
 import { env } from "../../config/env.js";
 
-// Generate access and refresh tokens
 const generateTokens = (user) => {
-  const payload = {
-    sub: user._id.toString(),
-    role: user.role,
-  };
+	// Keep token payloads minimal so signed credentials never contain profile data.
+	const payload = {
+		sub: user._id.toString(),
+		role: user.role,
+	};
 
-  return {
-    accessToken: generateAccessToken(payload),
-    refreshToken: generateRefreshToken(payload),
-  };
+	return {
+		accessToken: generateAccessToken(payload),
+		refreshToken: generateRefreshToken(payload),
+	};
 };
 
-// Create session in database
 const createSession = async (user, refreshToken, context) => {
-  const hashedToken = hashToken(refreshToken);
+	// Store only a hash so a database leak cannot be used as a refresh credential.
+	const hashedToken = hashToken(refreshToken);
 
-  return authRepository.createSession({
-    user: user._id,
-    refreshToken: hashedToken,
-    userAgent: context.userAgent,
-    ipAddress: context.ipAddress,
-    expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_MAX_AGE),
-  });
+	return authRepository.createSession({
+		user: user._id,
+		refreshToken: hashedToken,
+		userAgent: context.userAgent,
+		ipAddress: context.ipAddress,
+		expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_MAX_AGE),
+	});
 };
 
 const createAuthResponse = async (user, context) => {
-  const { accessToken, refreshToken } = generateTokens(user);
+	const { accessToken, refreshToken } = generateTokens(user);
 
-  await createSession(user, refreshToken, context);
+	// Persist the refresh session before sending a token the client can use.
+	await createSession(user, refreshToken, context);
 
-  return {
-    user: user.toJSON(),
-    accessToken,
-    refreshToken,
-  };
+	return {
+		user: user.toJSON(),
+		accessToken,
+		refreshToken,
+	};
 };
 
 const register = async (userData, context) => {
-  const existingUser = await authRepository.findUserByEmail(userData.email);
+	const existingUser = await authRepository.findUserByEmail(userData.email);
 
-  if (existingUser) {
-    throw new ApiError(HTTP_STATUS.CONFLICT, "User already exists");
-  }
+	if (existingUser) {
+		throw new ApiError(HTTP_STATUS.CONFLICT, "User already exists");
+	}
 
-  const user = await authRepository.createUser(userData);
+	const user = await authRepository.createUser(userData);
 
-  return createAuthResponse(user, context);
+	return createAuthResponse(user, context);
 };
 
 const login = async (credentials, context) => {
-  const { email, password } = credentials;
+	const { email, password } = credentials;
 
-  const user = await authRepository.findUserByEmail(email, true);
+	const user = await authRepository.findUserByEmail(email, true);
 
-  if (!user) {
-    throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid email or password");
-  }
+	if (!user) {
+		// Use the same response as a bad password so email addresses cannot be enumerated.
+		throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid email or password");
+	}
 
-  const isPasswordValid = await user.comparePassword(password);
+	const isPasswordValid = await user.comparePassword(password);
 
-  if (!isPasswordValid) {
-    throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid email or password");
-  }
+	if (!isPasswordValid) {
+		throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid email or password");
+	}
 
-  return createAuthResponse(user, context);
+	return createAuthResponse(user, context);
 };
 
 const validateRefreshSession = async (refreshToken) => {
-  if (!refreshToken) {
-    throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Refresh token is missing");
-  }
+	if (!refreshToken) {
+		throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Refresh token is missing");
+	}
 
-  const decoded = verifyRefreshToken(refreshToken);
+	const decoded = verifyRefreshToken(refreshToken);
 
-  const hashedToken = hashToken(refreshToken);
+	// Match the hash against a live session to support logout and server-side revocation.
+	const hashedToken = hashToken(refreshToken);
 
-  const session = await authRepository.findSessionByToken(hashedToken);
+	const session = await authRepository.findSessionByToken(hashedToken);
 
-  if (!session) {
-    throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid session");
-  }
+	if (!session) {
+		throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid session");
+	}
 
-  const user = await authRepository.findUserById(decoded.sub);
+	const user = await authRepository.findUserById(decoded.sub);
 
-  if (!user) {
-    throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "User not found");
-  }
+	if (!user) {
+		throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "User not found");
+	}
 
-  return {
-    user,
-    session,
-  };
+	return {
+		user,
+		session,
+	};
 };
 
 const refresh = async (refreshToken) => {
-  const { user } = await validateRefreshSession(refreshToken);
+	const { user } = await validateRefreshSession(refreshToken);
 
-  const accessToken = generateAccessToken({
-    sub: user._id.toString(),
-    role: user.role,
-  });
+	const accessToken = generateAccessToken({
+		sub: user._id.toString(),
+		role: user.role,
+	});
 
-  return {
-    accessToken,
-  };
+	return {
+		accessToken,
+	};
 };
 
 const logout = async (refreshToken) => {
-  const { session } = await validateRefreshSession(refreshToken);
+	const { session } = await validateRefreshSession(refreshToken);
 
-  await authRepository.revokeSession(session._id);
+	await authRepository.revokeSession(session._id);
 
-  return {
-    message: "User logged out successfully",
-  };
+	return {
+		message: "User logged out successfully",
+	};
 };
 
 export const authService = {
-  register,
-  login,
-  refresh,
-  logout,
+	register,
+	login,
+	refresh,
+	logout,
 };

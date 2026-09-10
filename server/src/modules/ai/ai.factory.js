@@ -5,23 +5,24 @@ import { groqProvider } from "./providers/groq.provider.js";
 
 const getProvider = (provider) => {
 
-    switch (provider) {
+	// Keep provider selection here so callers use the same contract regardless of vendor.
+	switch (provider) {
 
-        case AI_PROVIDERS.GEMINI:
-            return geminiProvider;
+		case AI_PROVIDERS.GEMINI:
+			return geminiProvider;
 
-        case AI_PROVIDERS.GROQ:
-            return groqProvider;
+		case AI_PROVIDERS.GROQ:
+			return groqProvider;
 
-        default:
-            throw new Error(
-                `Provider ${provider} not found`
-            );
+		default:
+			throw new Error(
+				`Provider ${provider} not found`
+			);
 
-    }
+	}
 
 };
 
 export const aiFactory = {
-    getProvider,
+	getProvider,
 };

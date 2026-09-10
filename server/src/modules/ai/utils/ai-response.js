@@ -1,23 +1,23 @@
 import { normalizeTokenUsage } from "./token-usage.js";
 
 const createAIResponse = ({
-  content = "",
-  provider,
-  model,
-  finishReason = null,
-  usage = {},
+	content = "",
+	provider,
+	model,
+	finishReason = null,
+	usage = {},
 }) => {
-  return {
-    content,
+	return {
+		content,
 
-    provider,
+		provider,
 
-    model,
+		model,
 
-    finishReason,
+		finishReason,
 
-    usage: normalizeTokenUsage(usage),
-  };
+		usage: normalizeTokenUsage(usage),
+	};
 };
 
 export { createAIResponse };

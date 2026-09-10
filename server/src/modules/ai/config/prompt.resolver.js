@@ -1,22 +1,22 @@
 import { SYSTEM_PROMPT } from "./system.prompt.js";
 
 const resolveSystemPrompt = (systemPrompt) => {
-    // Explicitly disabled
-    if (systemPrompt === null) {
-        return null;
-    }
+	// Callers use null when a task, such as summarization, must not inherit the normal persona.
+	if (systemPrompt === null) {
+		return null;
+	}
 
-    // Custom prompt provided
-    if (
-        typeof systemPrompt === "string" && systemPrompt.trim()
-    ) {
-        return systemPrompt.trim();
-    }
+	// Trim before sending it upstream so whitespace-only overrides fall back to the default.
+	if (
+		typeof systemPrompt === "string" && systemPrompt.trim()
+	) {
+		return systemPrompt.trim();
+	}
 
-    // Default Aira prompt
-    return SYSTEM_PROMPT;
+	// The shared prompt keeps ordinary chats consistent across providers.
+	return SYSTEM_PROMPT;
 };
 
 export {
-    resolveSystemPrompt,
+	resolveSystemPrompt,
 };

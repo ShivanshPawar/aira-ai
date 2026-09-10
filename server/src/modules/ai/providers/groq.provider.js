@@ -7,158 +7,155 @@ import { createAIResponse } from "../utils/ai-response.js";
 import { createDoneEvent, createTokenEvent } from "../contracts/ai-stream-event.js";
 import { normalizeAIError } from "../utils/ai-error.js";
 
-// initialize the client with your API key
+// Reuse one configured client instead of creating a network client for every generation.
 const client = new Groq({
-    apiKey: env.GROQ_API_KEY,
+	apiKey: env.GROQ_API_KEY,
 });
 
 const generateResponse = async (
-    conversation,
-    options = {}
+	conversation,
+	options = {}
 ) => {
 
-    try {
+	try {
 
-        // build the messages
-        const messages = buildGroqMessages(
-            conversation,
-            options.systemPrompt
-        );
+		// Groq expects a chat-completions payload, so adapt the neutral conversation first.
+		const messages = buildGroqMessages(
+			conversation,
+			options.systemPrompt
+		);
 
-        // generate the response
-        const response = await client.chat.completions.create({
+		const response = await client.chat.completions.create({
 
-            model: options.model,
+			model: options.model,
 
-            messages,
+			messages,
 
-            temperature: options.temperature,
+			temperature: options.temperature,
 
-            max_completion_tokens: options.maxOutputTokens,
+			max_completion_tokens: options.maxOutputTokens,
 
-            top_p: options.topP,
+			top_p: options.topP,
 
-        });
+		});
 
-        // return the response
-        return createAIResponse({
+		// Convert Groq's response fields into the result shape used by the message service.
+		return createAIResponse({
 
-            content: response.choices[0].message.content,
+			content: response.choices[0].message.content,
 
-            provider: options.provider,
+			provider: options.provider,
 
-            model: options.model,
+			model: options.model,
 
-            finishReason: response.choices[0].finish_reason ?? null,
+			finishReason: response.choices[0].finish_reason ?? null,
 
-            usage: {
+			usage: {
 
-                prompt: response.usage?.prompt_tokens ?? 0,
+				prompt: response.usage?.prompt_tokens ?? 0,
 
-                completion: response.usage?.completion_tokens ?? 0,
+				completion: response.usage?.completion_tokens ?? 0,
 
-                total: response.usage?.total_tokens ?? 0,
-            },
-        });
-    }
-    catch (error) {
-        throw normalizeAIError(error, { provider: options.provider });
-    }
+				total: response.usage?.total_tokens ?? 0,
+			},
+		});
+	}
+	catch (error) {
+		throw normalizeAIError(error, { provider: options.provider });
+	}
 
 };
 
 const generateStream = async (
-    conversation,
-    options = {}
+	conversation,
+	options = {}
 ) => {
 
-    try {
+	try {
 
-        // build the messages
-        const messages = buildGroqMessages(
-            conversation,
-            options.systemPrompt
-        );
+		const messages = buildGroqMessages(
+			conversation,
+			options.systemPrompt
+		);
 
-        // generate the stream
-        const request = {
-            model: options.model,
-            messages,
-            temperature: options.temperature,
-            max_completion_tokens: options.maxOutputTokens,
-            top_p: options.topP,
-            stream: true,
-            stream_options: {
-                include_usage: true,
-            },
-        };
+		const request = {
+			model: options.model,
+			messages,
+			temperature: options.temperature,
+			max_completion_tokens: options.maxOutputTokens,
+			top_p: options.topP,
+			stream: true,
+			stream_options: {
+				include_usage: true,
+			},
+		};
 
-        const stream = await client.chat.completions.create(
-            request,
-            options.signal
-                ? {
-                    signal: options.signal,
-                }
-                : undefined
-        );
+		const stream = await client.chat.completions.create(
+			request,
+			options.signal
+				? {
+					signal: options.signal,
+				}
+				: undefined
+		);
 
-        // return the stream
-        return (async function* () {
+		// Expose a normalized event stream so callers are independent of Groq chunk details.
+		return (async function* () {
 
-            let finalUsage = null;
-            let finalFinishReason = null;
+			let finalUsage = null;
+			let finalFinishReason = null;
 
-            try {
+			try {
 
-                for await (const chunk of stream) {
+				for await (const chunk of stream) {
 
-                    const choice = chunk.choices?.[0];
+					const choice = chunk.choices?.[0];
 
-                    const content =
-                        choice?.delta?.content ?? "";
+					const content =
+						choice?.delta?.content ?? "";
 
-                    if (content) {
-                        yield createTokenEvent(content);
-                    }
+					if (content) {
+						yield createTokenEvent(content);
+					}
 
-                    if (choice?.finish_reason) {
-                        finalFinishReason =
-                            choice.finish_reason;
-                    }
+					if (choice?.finish_reason) {
+						finalFinishReason =
+							choice.finish_reason;
+					}
 
-                    if (chunk.usage) {
-                        finalUsage = {
-                            prompt:
-                                chunk.usage.prompt_tokens ?? 0,
+					if (chunk.usage) {
+						finalUsage = {
+							prompt:
+								chunk.usage.prompt_tokens ?? 0,
 
-                            completion:
-                                chunk.usage.completion_tokens ?? 0,
+							completion:
+								chunk.usage.completion_tokens ?? 0,
 
-                            total:
-                                chunk.usage.total_tokens ?? 0,
-                        };
-                    }
-                }
+							total:
+								chunk.usage.total_tokens ?? 0,
+						};
+					}
+				}
 
-                // send the final event
-                yield createDoneEvent({
-                    finishReason: finalFinishReason,
-                    usage: finalUsage,
-                });
+				// Usage is only included in the final chunk when stream_options enables it.
+				yield createDoneEvent({
+					finishReason: finalFinishReason,
+					usage: finalUsage,
+				});
 
-            }
-            catch (error) {
-                throw normalizeAIError(error, { provider: options.provider });
-            }
+			}
+			catch (error) {
+				throw normalizeAIError(error, { provider: options.provider });
+			}
 
-        })();
-    }
-    catch (error) {
-        throw normalizeAIError(error, { provider: options.provider });
-    }
+		})();
+	}
+	catch (error) {
+		throw normalizeAIError(error, { provider: options.provider });
+	}
 };
 
 export const groqProvider = createAIProviderContract({
-    generateResponse,
-    generateStream,
+	generateResponse,
+	generateStream,
 });

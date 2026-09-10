@@ -1,3 +1,3 @@
 export const COOKIES = Object.freeze({
-  REFRESH_TOKEN: "refreshToken",
+	REFRESH_TOKEN: "refreshToken",
 });

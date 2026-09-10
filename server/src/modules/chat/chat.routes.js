@@ -1,20 +1,20 @@
 import { Router } from "express";
 import {
-  createChat,
-  getChats,
-  updateChat,
-  deleteChat,
-  renameChat,
-  togglePin,
-  toggleArchive,
-  getArchivedChats,
+	createChat,
+	getChats,
+	updateChat,
+	deleteChat,
+	renameChat,
+	togglePin,
+	toggleArchive,
+	getArchivedChats,
 } from "./chat.controller.js";
 import {
-  chatIdSchema,
-  chatListSchema,
-  createChatSchema,
-  updateChatSchema,
-  updateChatTitleSchema,
+	chatIdSchema,
+	chatListSchema,
+	createChatSchema,
+	updateChatSchema,
+	updateChatTitleSchema,
 } from "./chat.validator.js";
 import { protect } from "./../../middlewares/auth.middleware.js";
 import { validate } from "./../../middlewares/validation.middleware.js";

@@ -6,33 +6,35 @@ import { asyncHandler } from "../shared/utils/asyncHandler.js";
 
 export const protect = asyncHandler(async (req, res, next) => {
 
-    const authorization = req.headers.authorization;
+	const authorization = req.headers.authorization;
 
-    if (!authorization?.startsWith("Bearer ")) {
-        throw new ApiError(
-            HTTP_STATUS.UNAUTHORIZED,
-            "Access token is missing."
-        );
-    }
+	if (!authorization?.startsWith("Bearer ")) {
+		throw new ApiError(
+			HTTP_STATUS.UNAUTHORIZED,
+			"Access token is missing."
+		);
+	}
 
-    const token = authorization.split(" ")[1];
+	const token = authorization.split(" ")[1];
 
-    const decoded = verifyAccessToken(token);
+	const decoded = verifyAccessToken(token);
 
-    const user = await authRepository.findUserById(decoded.sub);
+	// A valid signature is not enough when the account was deleted after the token was issued.
+	const user = await authRepository.findUserById(decoded.sub);
 
-    if (!user) {
-        throw new ApiError(
-            HTTP_STATUS.UNAUTHORIZED,
-            "User not found."
-        );
-    }
+	if (!user) {
+		throw new ApiError(
+			HTTP_STATUS.UNAUTHORIZED,
+			"User not found."
+		);
+	}
 
-    req.auth = {
-        userId: user._id,
-        role: user.role,
-    };
+	// Expose only the identity needed by downstream authorization checks.
+	req.auth = {
+		userId: user._id,
+		role: user.role,
+	};
 
-    next();
+	next();
 
 });

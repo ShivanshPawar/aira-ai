@@ -2,41 +2,42 @@ import { User } from "../users/user.model.js";
 import { Session } from "./session.model.js";
 
 export const authRepository = {
-  async createUser(userData) {
-    return User.create(userData);
-  },
+	async createUser(userData) {
+		return User.create(userData);
+	},
 
-  async findUserByEmail(email, includePassword = false) {
-    const query = User.findOne({ email });
+	async findUserByEmail(email, includePassword = false) {
+		const query = User.findOne({ email });
 
-    if (includePassword) {
-      query.select("+password");
-    }
+		if (includePassword) {
+			query.select("+password");
+		}
 
-    return query;
-  },
+		return query;
+	},
 
-  async findUserById(userId) {
-    return User.findById(userId);
-  },
+	async findUserById(userId) {
+		return User.findById(userId);
+	},
 
-  async createSession(sessionData) {
-    return Session.create(sessionData);
-  },
+	async createSession(sessionData) {
+		return Session.create(sessionData);
+	},
 
-  async findSessionByToken(hashedToken) {
-    return Session.findOne({
-      refreshToken: hashedToken,
-      isRevoked: false,
-      expiresAt: { $gt: new Date() },
-    });
-  },
+	async findSessionByToken(hashedToken) {
+		// Expired sessions are treated as invalid even if TTL cleanup has not run yet.
+		return Session.findOne({
+			refreshToken: hashedToken,
+			isRevoked: false,
+			expiresAt: { $gt: new Date() },
+		});
+	},
 
-  async revokeSession(sessionId) {
-    return Session.findByIdAndUpdate(
-      sessionId,
-      { isRevoked: true },
-      { returnDocument: "after" },
-    );
-  },
+	async revokeSession(sessionId) {
+		return Session.findByIdAndUpdate(
+			sessionId,
+			{ isRevoked: true },
+			{ returnDocument: "after" },
+		);
+	},
 };

@@ -10,9 +10,9 @@ const router = Router();
 router.use(protect);
 
 router.post(
-    "/upload",
-    uploadSingleFile,
-    uploadFile
+	"/upload",
+	uploadSingleFile,
+	uploadFile
 );
 
 export default router;

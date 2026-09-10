@@ -6,48 +6,49 @@ import { textHandler } from "./handlers/text.handler.js";
 import { markdownHandler } from "./handlers/markdown.handler.js";
 
 const handlers = {
-    [FILE_TYPES.IMAGE]: imageHandler,
-    [FILE_TYPES.DOCUMENT]: pdfHandler,
-    [FILE_TYPES.TEXT]: textHandler,
-    [FILE_TYPES.MARKDOWN]: markdownHandler,
+	[FILE_TYPES.IMAGE]: imageHandler,
+	[FILE_TYPES.DOCUMENT]: pdfHandler,
+	[FILE_TYPES.TEXT]: textHandler,
+	[FILE_TYPES.MARKDOWN]: markdownHandler,
 };
 
 const buildParts = async (message) => {
-    const parts = [];
+	const parts = [];
 
-    if (message.content?.trim()) {
-        parts.push({
-            text: message.content,
-        });
-    }
+	if (message.content?.trim()) {
+		parts.push({
+			text: message.content,
+		});
+	}
 
-    for (const attachment of message.attachments || []) {
-        const handler = handlers[attachment.fileType];
+	for (const attachment of message.attachments || []) {
+		const handler = handlers[attachment.fileType];
 
-        if (!handler) {
-            continue;
-        }
+		// Unsupported persisted types are skipped so one bad attachment cannot block the chat.
+		if (!handler) {
+			continue;
+		}
 
-        const handlerParts =
-            await handler.buildParts(
-                attachment
-            );
+		const handlerParts =
+			await handler.buildParts(
+				attachment
+			);
 
-        parts.push(...handlerParts);
-    }
+		parts.push(...handlerParts);
+	}
 
-    return parts;
+	return parts;
 };
 
 export const buildGeminiContents = async (conversation) => {
-    const contents = [];
+	const contents = [];
 
-    for (const message of conversation) {
-        contents.push({
-            role: message.role,
-            parts: await buildParts(message),
-        });
-    }
+	for (const message of conversation) {
+		contents.push({
+			role: message.role,
+			parts: await buildParts(message),
+		});
+	}
 
-    return contents;
+	return contents;
 };

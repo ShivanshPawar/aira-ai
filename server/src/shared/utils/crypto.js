@@ -1,8 +1,9 @@
 import crypto from "crypto";
 
 export const hashToken = (token) => {
-    return crypto
-        .createHash("sha256")
-        .update(token)
-        .digest("hex");
+	// Refresh tokens remain usable credentials, so persist a one-way digest instead.
+	return crypto
+		.createHash("sha256")
+		.update(token)
+		.digest("hex");
 }

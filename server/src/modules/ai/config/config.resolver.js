@@ -6,56 +6,56 @@ import { SYSTEM_PROMPT } from "./system.prompt.js";
 
 const getDefaultConfig = (provider) => {
 
-    switch (provider) {
+	switch (provider) {
 
-        case AI_PROVIDERS.GROQ:
-            return GROQ_CONFIG;
+		case AI_PROVIDERS.GROQ:
+			return GROQ_CONFIG;
 
-        case AI_PROVIDERS.GEMINI:
-            return GEMINI_CONFIG;
+		case AI_PROVIDERS.GEMINI:
+			return GEMINI_CONFIG;
 
-        default:
-            return GROQ_CONFIG;
-    }
+		default:
+			return GROQ_CONFIG;
+	}
 };
 
 const resolveConfig = (options = {}) => {
 
-    const provider =options.provider ?? DEFAULT_PROVIDER;
+	const provider =options.provider ?? DEFAULT_PROVIDER;
 
-    const defaults = getDefaultConfig(provider);
+	const defaults = getDefaultConfig(provider);
 
-    let systemPrompt;
+	let systemPrompt;
 
-    if (options.systemPrompt === null) {
+	if (options.systemPrompt === null) {
 
-        // Explicitly disabled
-        systemPrompt = null;
+		// Summaries pass null to omit the normal assistant persona deliberately.
+		systemPrompt = null;
 
-    } else if (options.systemPrompt !== undefined) {
+	} else if (options.systemPrompt !== undefined) {
 
-        // Custom prompt
-        systemPrompt = options.systemPrompt;
+		// A chat prompt takes precedence over the shared persona without changing model defaults.
+		systemPrompt = options.systemPrompt;
 
-    } else {
+	} else {
 
-        // Normal chat → Aira
-        systemPrompt = SYSTEM_PROMPT;
-    }
+		// Use the shared persona for normal chats when no override is present.
+		systemPrompt = SYSTEM_PROMPT;
+	}
 
-    const config = {
+	const config = {
 
-        ...defaults,
+		...defaults,
 
-        ...options,
+		...options,
 
-        systemPrompt,
+		systemPrompt,
 
-    };
+	};
 
-    return config;
+	return config;
 };
 
 export {
-    resolveConfig,
+	resolveConfig,
 };
