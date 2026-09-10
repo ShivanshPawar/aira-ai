@@ -1,89 +1,78 @@
 import { AI_CONTEXT } from "../ai.constants.js";
 
 const estimateTokens = (value = "") => {
-    return Math.ceil(String(value).length / 3);
+  return Math.ceil(String(value).length / 3);
 };
 
-const truncateToTokenBudget = (
-    value = "",
-    maxTokens
-) => {
-    return String(value).slice(0, maxTokens * 3);
+const truncateToTokenBudget = (value = "", maxTokens) => {
+  return String(value).slice(0, maxTokens * 3);
 };
 
 const getMessageTokens = (message) => {
-    return estimateTokens(message.content ?? "");
+  return estimateTokens(message.content ?? "");
 };
 
 const buildContextWindow = (
-    history = [],
-    summary = "",
-    maxTokens = AI_CONTEXT.MAX_CONTEXT_TOKENS
+  history = [],
+  summary = "",
+  maxTokens = AI_CONTEXT.MAX_CONTEXT_TOKENS,
 ) => {
+  const selected = [];
 
-    const selected = [];
+  const summaryText = summary?.trim()
+    ? `Conversation Summary:\n\n${summary.trim()}`
+    : "";
 
-    const summaryText = summary?.trim()
-        ? `Conversation Summary:\n\n${summary.trim()}`
-        : "";
+  const summaryTokens = estimateTokens(summaryText);
 
-    const summaryTokens = estimateTokens(summaryText);
+  let remainingTokens = Math.max(maxTokens - summaryTokens, 0);
 
-    let remainingTokens = Math.max(
-        maxTokens - summaryTokens,
-        0
-    );
+  for (let i = history.length - 1; i >= 0; i--) {
+    const message = history[i];
 
-    for (let i = history.length - 1; i >= 0; i--) {
-
-        const message = history[i];
-
-        const tokens = getMessageTokens(message);
-
-        if (tokens > remainingTokens) {
-
-            if (selected.length === 0 && remainingTokens > 0) {
-
-                selected.unshift({
-                    ...message,
-
-                    content: truncateToTokenBudget(
-                        message.content ?? "",
-                        remainingTokens
-                    ),
-
-                    attachments: message.attachments || [],
-                });
-            }
-
-            break;
-        }
-
-        selected.unshift(message);
-
-        remainingTokens -= tokens;
+    if (message.status && message.status !== "COMPLETED") {
+      continue;
     }
 
-    const context = [];
+    const tokens = getMessageTokens(message);
 
-    if (summaryText) {
+    if (tokens > remainingTokens) {
+      if (selected.length === 0 && remainingTokens > 0) {
+        selected.unshift({
+          ...message,
 
-        context.push({
+          content: truncateToTokenBudget(
+            message.content ?? "",
+            remainingTokens,
+          ),
 
-            role: "SYSTEM",
-
-            content: summaryText,
-
-            attachments: [],
-
+          attachments: message.attachments || [],
         });
+      }
+
+      break;
     }
 
-    context.push(...selected);
+    selected.unshift(message);
 
-    return context;
+    remainingTokens -= tokens;
+  }
+
+  const context = [];
+
+  if (summaryText) {
+    context.push({
+      role: "SYSTEM",
+
+      content: summaryText,
+
+      attachments: [],
+    });
+  }
+
+  context.push(...selected);
+
+  return context;
 };
 
-export {
-    buildContextWindow,
-};
+export { buildContextWindow };

@@ -2,130 +2,146 @@ import { MESSAGE_ROLES } from "../../shared/constants/message.js";
 import { Message } from "./message.model.js";
 
 const createMessage = async (messageData) => {
-    return Message.create(messageData);
+  return Message.create(messageData);
 };
 
 const findMessageById = async (messageId) => {
-    return Message.findById(messageId).lean();
+  return Message.findById(messageId).lean();
 };
 
 const findMessagesByChat = async (chatId) => {
-    return Message.find({
-        chat: chatId,
+  return Message.find({
+    chat: chatId,
+  })
+    .populate("attachments")
+    .sort({
+      createdAt: 1,
+      _id: 1,
     })
-        .populate("attachments")
-        .sort({
-            createdAt: 1,
-        })
-        .lean();
+    .lean();
 };
 
 const findLastMessageByChat = async (chatId) => {
-    return Message.findOne({
-        chat: chatId,
-    }).sort({
-        createdAt: -1,
+  return Message.findOne({
+    chat: chatId,
+  })
+    .sort({
+      createdAt: -1,
+      _id: -1,
     })
-        .lean();
+    .lean();
 };
 
 const findPreviousUserMessage = async (
-    chatId,
-    assistantCreatedAt,
+  chatId,
+  assistantCreatedAt,
+  assistantMessageId,
 ) => {
+  return Message.findOne({
+    chat: chatId,
+    role: MESSAGE_ROLES.USER,
 
-    return Message.findOne({
-        chat: chatId,
-        role: MESSAGE_ROLES.USER,
-
+    $or: [
+      {
         createdAt: {
-            $lt: assistantCreatedAt,
+          $lt: assistantCreatedAt,
         },
-    }).sort({
-        createdAt: -1,
+      },
+      {
+        createdAt: assistantCreatedAt,
+        _id: {
+          $lt: assistantMessageId,
+        },
+      },
+    ],
+  })
+    .sort({
+      createdAt: -1,
+      _id: -1,
     })
-        .lean();
+    .lean();
 };
 
-const deleteMessagesAfter = async (
-    chatId,
-    createdAt
-) => {
-
-    return Message.deleteMany({
-        chat: chatId,
+const deleteMessagesAfter = async (chatId, createdAt, messageId) => {
+  return Message.deleteMany({
+    chat: chatId,
+    $or: [
+      {
         createdAt: {
-            $gt: createdAt,
+          $gt: createdAt,
         },
-    });
-
+      },
+      {
+        createdAt,
+        _id: {
+          $gt: messageId,
+        },
+      },
+    ],
+  });
 };
 
 const updateMessage = async (messageId, data) => {
-    return Message.findByIdAndUpdate(
-        messageId,
-        data,
-        {
-            returnDocument: "after",
-            runValidators: true,
-        }
-    );
+  return Message.findByIdAndUpdate(messageId, data, {
+    returnDocument: "after",
+    runValidators: true,
+  });
 };
 
 const deleteMessage = async (messageId) => {
-    return Message.findByIdAndDelete(messageId);
+  return Message.findByIdAndDelete(messageId);
 };
 
-const updateMessageStatus = async (
-    messageId,
-    status,
-    data = {}
-) => {
+const deleteMessagesByChat = async (chatId) => {
+  return Message.deleteMany({
+    chat: chatId,
+  });
+};
 
-    return Message.findByIdAndUpdate(
-        messageId,
-        {
-            $set: {
-                status,
-                ...data,
-            },
-        },
-        {
-            returnDocument: "after",
-            runValidators: true,
-        }
-    ).lean();
+const updateMessageStatus = async (messageId, status, data = {}) => {
+  return Message.findByIdAndUpdate(
+    messageId,
+    {
+      $set: {
+        status,
+        ...data,
+      },
+    },
+    {
+      returnDocument: "after",
+      runValidators: true,
+    },
+  ).lean();
 };
 
 const countMessagesByChat = async (chatId) => {
-    return Message.countDocuments({
-        chat: chatId,
-    });
+  return Message.countDocuments({
+    chat: chatId,
+  });
 };
 
 const findLatestMessageByChat = async (chatId) => {
-    return Message.findOne({
-        chat: chatId,
+  return Message.findOne({
+    chat: chatId,
+  })
+    .sort({
+      createdAt: -1,
+      _id: -1,
     })
-        .sort({
-            createdAt: -1,
-            _id: -1,
-        })
-        .lean();
+    .lean();
 };
 
-
-
 export const messageRepository = {
-    createMessage,
-    findMessageById,
-    findMessagesByChat,
-    updateMessage,
-    deleteMessage,
-    findLastMessageByChat,
-    findPreviousUserMessage,
-    deleteMessagesAfter,
-    updateMessageStatus,
-    countMessagesByChat,
-    findLatestMessageByChat,
+  createMessage,
+  findMessageById,
+  findMessagesByChat,
+  updateMessage,
+  deleteMessage,
+  deleteMessagesByChat,
+  findLastMessageByChat,
+  findPreviousUserMessage,
+  deleteMessagesAfter,
+  updateMessageStatus,
+  countMessagesByChat,
+  findLatestMessageByChat,
 };

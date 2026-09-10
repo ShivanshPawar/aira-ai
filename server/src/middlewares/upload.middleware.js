@@ -2,39 +2,23 @@ import multer from "multer";
 
 const storage = multer.memoryStorage();
 
-const allowedMimeTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
+const upload = multer({
+  storage,
 
-    "application/pdf",
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 1,
+  },
+});
 
-    "text/plain",
-
-    "text/markdown",
-];
-
-const fileFilter = (req, file, cb) => {
-    if (
-        !allowedMimeTypes.includes(file.mimetype)
-    ) {
-
-        return cb(
-            new Error("Unsupported file type")
-        );
+export const uploadSingleFile = (req, res, next) => {
+  upload.any()(req, res, (error) => {
+    if (error) {
+      return next(error);
     }
 
-    cb(null, true);
+    req.file = req.files?.[0];
+
+    return next();
+  });
 };
-
-export const upload = multer({
-
-
-    storage,
-
-    limits: {
-        fileSize: 10 * 1024 * 1024,
-    },
-
-    fileFilter,
-});

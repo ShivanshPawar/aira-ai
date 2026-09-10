@@ -1,8 +1,8 @@
 import { env } from "../../config/env.js";
 
 export const refreshCookieOptions = {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+  httpOnly: true,
+  secure: env.NODE_ENV === "production",
+  sameSite: env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: env.REFRESH_TOKEN_MAX_AGE,
 };

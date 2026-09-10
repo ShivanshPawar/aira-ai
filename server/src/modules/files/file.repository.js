@@ -13,7 +13,7 @@ const updateFile = (fileId, data) => {
         fileId,
         data,
         {
-            new: true,
+            returnDocument: "after",
             runValidators: true,
         }
     );

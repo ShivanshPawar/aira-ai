@@ -1,7 +1,7 @@
 import { Router } from "express";
 
 import { protect } from "../../middlewares/auth.middleware.js";
-import { upload } from "../../middlewares/upload.middleware.js";
+import { uploadSingleFile } from "../../middlewares/upload.middleware.js";
 
 import { uploadFile } from "./file.controller.js";
 
@@ -11,7 +11,7 @@ router.use(protect);
 
 router.post(
     "/upload",
-    upload.single("file"),
+    uploadSingleFile,
     uploadFile
 );
 

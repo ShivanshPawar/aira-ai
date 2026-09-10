@@ -1,168 +1,245 @@
-import path from "path";
-
 import { storageService } from "../../services/storage/storage.service.js";
 import { fileRepository } from "./file.repository.js";
 import { FILE_PROVIDER, FILE_STATUS, FILE_TYPES } from "./file.constants.js";
 import { HTTP_STATUS } from "../../shared/constants/httpStatus.js";
 import { ApiError } from "../../shared/errors/ApiError.js";
+import {
+  getFileExtension,
+  isSupportedUploadMimeType,
+  isTextMimeType,
+  resolveUploadMimeType,
+} from "./file-upload.utils.js";
 
 const getFileType = (mimeType) => {
+  if (mimeType.startsWith("image/")) {
+    return FILE_TYPES.IMAGE;
+  }
 
-    if (mimeType.startsWith("image/")) {
-        return FILE_TYPES.IMAGE;
-    }
+  if (mimeType === "application/pdf") {
+    return FILE_TYPES.DOCUMENT;
+  }
 
-    if (mimeType === "application/pdf") {
-        return FILE_TYPES.DOCUMENT;
-    }
+  if (mimeType === "text/markdown") {
+    return FILE_TYPES.MARKDOWN;
+  }
 
-    if (mimeType.startsWith("text/")) {
-        return FILE_TYPES.TEXT;
-    }
+  if (isTextMimeType(mimeType)) {
+    return FILE_TYPES.TEXT;
+  }
 
-    return FILE_TYPES.OTHER;
+  return FILE_TYPES.OTHER;
 };
 
-const uploadFile = async (
-    userId,
-    file
-) => {
+const hasPrefix = (buffer, bytes) => {
+  return bytes.every((byte, index) => buffer[index] === byte);
+};
 
-    if (!file) {
-        throw new Error("File is required");
+const hasIsoBaseMediaBrand = (buffer, brands) => {
+  return (
+    buffer.subarray(4, 8).toString("ascii") === "ftyp" &&
+    brands.includes(buffer.subarray(8, 12).toString("ascii"))
+  );
+};
+
+const assertFileContentMatchesMimeType = (file, mimeType) => {
+  const buffer = file?.buffer;
+
+  if (!Buffer.isBuffer(buffer) || !buffer.length) {
+    throw new ApiError(
+      HTTP_STATUS.BAD_REQUEST,
+      "Uploaded file is empty or unreadable.",
+    );
+  }
+
+  const signatures = {
+    "image/jpeg": [0xff, 0xd8, 0xff],
+    "image/png": [0x89, 0x50, 0x4e, 0x47],
+    "image/webp": [0x52, 0x49, 0x46, 0x46],
+    "image/gif": [0x47, 0x49, 0x46, 0x38],
+    "image/bmp": [0x42, 0x4d],
+    "image/x-icon": [0x00, 0x00, 0x01, 0x00],
+    "application/pdf": [0x25, 0x50, 0x44, 0x46],
+  };
+
+  if (signatures[mimeType]) {
+    if (!hasPrefix(buffer, signatures[mimeType])) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        "File contents do not match the declared type.",
+      );
     }
 
-    const uploaded = await storageService.upload(
-        file,
-        FILE_PROVIDER.IMAGEKIT
+    if (
+      mimeType === "image/webp" &&
+      buffer.subarray(8, 12).toString("ascii") !== "WEBP"
+    ) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        "File contents do not match the declared type.",
+      );
+    }
+
+    return;
+  }
+
+  if (
+    (mimeType === "image/tiff" &&
+      !hasPrefix(buffer, [0x49, 0x49, 0x2a, 0x00]) &&
+      !hasPrefix(buffer, [0x4d, 0x4d, 0x00, 0x2a])) ||
+    (mimeType === "image/avif" &&
+      !hasIsoBaseMediaBrand(buffer, ["avif", "avis"])) ||
+    ((mimeType === "image/heic" || mimeType === "image/heif") &&
+      !hasIsoBaseMediaBrand(buffer, ["heic", "heix", "hevc", "hevx", "mif1"]))
+  ) {
+    throw new ApiError(
+      HTTP_STATUS.BAD_REQUEST,
+      "File contents do not match the declared type.",
     );
+  }
 
-    const savedFile = await fileRepository.createFile({
+  if (mimeType === "image/svg+xml") {
+    const svgStart = buffer
+      .subarray(0, Math.min(buffer.length, 1024))
+      .toString("utf8")
+      .trimStart()
+      .toLowerCase();
 
-        user: userId,
+    if (!svgStart.includes("<svg")) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        "File contents do not match the declared type.",
+      );
+    }
 
-        originalName: uploaded.originalName,
+    return;
+  }
 
-        fileName: uploaded.fileName,
+  if (isTextMimeType(mimeType) && buffer.includes(0)) {
+    throw new ApiError(
+      HTTP_STATUS.BAD_REQUEST,
+      "File contents do not match the declared type.",
+    );
+  }
+};
 
-        mimeType: uploaded.mimeType,
+const uploadFile = async (userId, file) => {
+  if (!file) {
+    throw new ApiError(HTTP_STATUS.BAD_REQUEST, "File is required.");
+  }
 
-        extension: path.extname(uploaded.fileName),
+  const mimeType = resolveUploadMimeType(file);
 
-        fileType: getFileType(uploaded.mimeType),
+  if (!isSupportedUploadMimeType(mimeType)) {
+    throw new ApiError(
+      HTTP_STATUS.BAD_REQUEST,
+      "Supported uploads are images, text files, Markdown files, and PDFs.",
+    );
+  }
 
-        size: uploaded.size,
+  const normalizedFile = {
+    ...file,
+    mimetype: mimeType,
+  };
 
-        provider: uploaded.provider,
+  assertFileContentMatchesMimeType(normalizedFile, mimeType);
 
-        providerFileId: uploaded.providerFileId,
+  const uploaded = await storageService.upload(
+    normalizedFile,
+    FILE_PROVIDER.IMAGEKIT,
+  );
 
-        url: uploaded.url,
+  const savedFile = await fileRepository.createFile({
+    user: userId,
 
-        thumbnailUrl: uploaded.thumbnailUrl,
+    originalName: uploaded.originalName,
 
-        status: FILE_STATUS.READY,
-    });
+    fileName: uploaded.fileName,
 
-    return savedFile;
+    mimeType: uploaded.mimeType,
+
+    extension: getFileExtension(uploaded.fileName),
+
+    fileType: getFileType(uploaded.mimeType),
+
+    size: uploaded.size,
+
+    provider: uploaded.provider,
+
+    providerFileId: uploaded.providerFileId,
+
+    url: uploaded.url,
+
+    thumbnailUrl: uploaded.thumbnailUrl,
+
+    status: FILE_STATUS.READY,
+  });
+
+  return savedFile;
 };
 
 const getFileById = async (fileId) => {
+  const file = await fileRepository.findFileById(fileId);
 
-    const file = await fileRepository.findFileById(fileId);
+  if (!file) {
+    throw new ApiError(HTTP_STATUS.NOT_FOUND, "File not found");
+  }
 
-    if (!file) {
-        throw new ApiError(
-            HTTP_STATUS.NOT_FOUND,
-            "File not found"
-        );
-    }
-
-    return file;
+  return file;
 };
 
 const getFilesByIds = async (fileIds = []) => {
+  if (!fileIds.length) {
+    return [];
+  }
 
-    if (!fileIds.length) {
-        return [];
-    }
-
-    return fileRepository.findFilesByIds(fileIds);
+  return fileRepository.findFilesByIds(fileIds);
 };
 
-const verifyOwnership = async (
-    userId,
-    fileIds = []
-) => {
+const verifyOwnership = async (userId, fileIds = []) => {
+  if (!fileIds.length) {
+    return [];
+  }
 
-    if (!fileIds.length) {
-        return [];
-    }
+  const files = await fileRepository.findFilesByIds(fileIds);
 
-    const files = await fileRepository.findFilesByIds(fileIds);
+  if (files.length !== fileIds.length) {
+    throw new ApiError(HTTP_STATUS.NOT_FOUND, "One or more files not found.");
+  }
 
-    if (files.length !== fileIds.length) {
-        throw new ApiError(
-            HTTP_STATUS.NOT_FOUND,
-            "One or more files not found."
-        );
-    }
-
-    for (const file of files) {
-
-        if (file.user.toString() !== userId.toString()) {
-
-            throw new ApiError(
-                HTTP_STATUS.FORBIDDEN,
-                "You don't own this file."
-            );
-
-        }
-
-        if (file.status !== FILE_STATUS.READY) {
-
-            throw new ApiError(
-                HTTP_STATUS.BAD_REQUEST,
-                "File upload is not complete."
-            );
-
-        }
-
-    }
-
-    return files;
-};
-
-const deleteFile = async (
-    userId,
-    fileId
-) => {
-
-    const file = await getFileById(fileId);
-
+  for (const file of files) {
     if (file.user.toString() !== userId.toString()) {
-
-        throw new ApiError(
-            HTTP_STATUS.FORBIDDEN,
-            "Unauthorized"
-        );
-
+      throw new ApiError(HTTP_STATUS.FORBIDDEN, "You don't own this file.");
     }
 
-    await storageService.remove(
-        file.providerFileId,
-        file.provider
-    );
+    if (file.status !== FILE_STATUS.READY) {
+      throw new ApiError(
+        HTTP_STATUS.BAD_REQUEST,
+        "File upload is not complete.",
+      );
+    }
+  }
 
-    await fileRepository.deleteFile(fileId);
+  return files;
+};
 
-    return true;
+const deleteFile = async (userId, fileId) => {
+  const file = await getFileById(fileId);
+
+  if (file.user.toString() !== userId.toString()) {
+    throw new ApiError(HTTP_STATUS.FORBIDDEN, "Unauthorized");
+  }
+
+  await storageService.remove(file.providerFileId, file.provider);
+
+  await fileRepository.deleteFile(fileId);
+
+  return true;
 };
 
 export const fileService = {
-    uploadFile,
-    getFileById,
-    getFilesByIds,
-    verifyOwnership,
-    deleteFile
+  uploadFile,
+  getFileById,
+  getFilesByIds,
+  verifyOwnership,
+  deleteFile,
 };
