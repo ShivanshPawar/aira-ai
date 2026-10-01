@@ -1,8 +1,10 @@
+import { useSessionRestore } from './features/auth/useSessionRestore.js'
+import AppRouter from './app/router.jsx'
 
 const App = () => {
-  return (
-    <div className='w-screen h-screen bg-black text-white'>App</div>
-  )
+  useSessionRestore()
+
+  return <AppRouter />
 }
 
 export default App
