@@ -142,7 +142,7 @@ const SettingsPage = () => {
   }
 
   return (
-    <section className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-10">
+    <section className="scrollbar-hidden mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto overscroll-contain px-5 py-10 pb-12 sm:px-10">
       <p className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#70b9ed]"><Settings2 size={13} /> Preferences</p>
       <h1 className="text-4xl font-semibold">Make AIRA yours</h1>
       <p className="mt-2 text-sm text-[#92958c]">{activeChatId ? 'Provider and model changes update this conversation and your defaults for new conversations.' : 'Choose how you want AIRA to work with you.'}</p>

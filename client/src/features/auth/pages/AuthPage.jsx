@@ -32,10 +32,10 @@ const AuthPage = ({ mode }) => {
     <div>
       <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.2em] text-[#d8f36a]">{isRegister ? 'Begin here' : 'Welcome back'}</p>
       <h2 className="text-4xl font-semibold leading-tight text-[#f4f0e8] sm:text-[46px]">
-        {isRegister ? 'A new space to think.' : 'Pick up your thread.'}
+        {isRegister ? 'Make space for your thoughts.' : 'Pick up where you left off.'}
       </h2>
       <p className="mt-3 text-sm leading-6 text-[#92958c]">
-        {isRegister ? 'Create your account and make the space your own.' : 'Sign in to return to your conversations.'}
+        {isRegister ? 'Create your account and give your ideas a place to grow.' : 'Sign in to return to your conversations and keep your thoughts moving.'}
       </p>
 
       <form className="mt-9 space-y-5" onSubmit={submit}>

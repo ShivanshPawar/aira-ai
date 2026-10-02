@@ -10,7 +10,7 @@ const ArchivedChatsPage = () => {
   const chats = data?.items || []
 
   return (
-    <section className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-10">
+    <section className="scrollbar-hidden mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto overscroll-contain px-5 py-10 sm:px-10">
       <p className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#d8f36a]"><Archive size={13} /> Archive</p>
       <h1 className="text-4xl font-semibold">Where old thoughts live</h1>
       <p className="mt-2 text-sm text-[#92958c]">Your archived conversations are kept here, ready whenever you want to revisit them.</p>
