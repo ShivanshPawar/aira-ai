@@ -18,7 +18,43 @@ export const messagesApi = apiSlice.injectEndpoints({
         { type: 'ChatList', id: 'ACTIVE' },
       ],
     }),
+    editMessage: builder.mutation({
+      query: ({ messageId, content, attachments = [] }) => ({
+        url: `/messages/${messageId}`,
+        method: 'PUT',
+        body: { content, attachments },
+      }),
+      invalidatesTags: (_, __, { chatId }) => [
+        { type: 'Messages', id: chatId },
+        { type: 'Chat', id: chatId },
+        { type: 'ChatList', id: 'ACTIVE' },
+      ],
+    }),
+    regenerateMessage: builder.mutation({
+      query: ({ messageId }) => ({ url: `/messages/${messageId}/regenerate`, method: 'POST' }),
+      invalidatesTags: (_, __, { messageId, chatId }) => [
+        { type: 'Messages', id: chatId },
+        { type: 'Chat', id: chatId },
+        { type: 'ChatList', id: 'ACTIVE' },
+        { type: 'Message', id: messageId },
+      ],
+    }),
+    deleteMessage: builder.mutation({
+      query: ({ messageId }) => ({ url: `/messages/${messageId}`, method: 'DELETE' }),
+      invalidatesTags: (_, __, { messageId, chatId }) => [
+        { type: 'Messages', id: chatId },
+        { type: 'Chat', id: chatId },
+        { type: 'ChatList', id: 'ACTIVE' },
+        { type: 'Message', id: messageId },
+      ],
+    }),
   }),
 })
 
-export const { useGetMessagesQuery, useSendMessageMutation } = messagesApi
+export const {
+  useGetMessagesQuery,
+  useSendMessageMutation,
+  useEditMessageMutation,
+  useRegenerateMessageMutation,
+  useDeleteMessageMutation,
+} = messagesApi

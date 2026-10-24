@@ -42,7 +42,6 @@ const ChatListItem = ({ chat, archived = false, compact = false, onNavigate = ()
   }
 
   const removeChat = () => {
-    if (!window.confirm(`Delete "${chat.title || 'New Chat'}" and its messages?`)) return
     runAction(async () => {
       await deleteChat(chat._id).unwrap()
       if (chatId === chat._id) navigate(ROUTES.chats, { replace: true })

@@ -72,7 +72,7 @@ const MessageComposer = ({ provider = 'GROQ', onSend, onStop, isStreaming = fals
   }
 
   return (
-    <div className="shrink-0 border-t border-white/10 px-5 pb-5 pt-4 sm:px-8">
+    <div className="shrink-0 px-5 pb-5 pt-4 sm:px-8">
       <form className="mx-auto max-w-3xl" onSubmit={submit}>
         {attachments.length > 0 && <ul aria-label="Attachments" className="mb-2 flex flex-wrap gap-2">
           {attachments.map((file) => <li className="flex max-w-full items-center gap-2 border border-white/10 bg-[#191b17] px-2 py-1.5 text-xs text-[#cbc8bf]" key={file._id}>
@@ -82,12 +82,12 @@ const MessageComposer = ({ provider = 'GROQ', onSend, onStop, isStreaming = fals
         </ul>}
         <div className="flex items-end gap-3 border border-white/15 bg-[#191b17] p-3 focus-within:border-[#d8f36a]/70">
           <input ref={inputRef} accept="image/*,.pdf,.csv,.log,.markdown,.md,.txt,.json,.xml,.yaml,.yml" className="sr-only" disabled={!acceptsAttachments || isUploading || isStreaming} multiple onChange={handleFiles} type="file" />
-          <button aria-label="Attach files" className="grid size-10 shrink-0 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#d8f36a] disabled:cursor-not-allowed disabled:opacity-40" disabled={!acceptsAttachments || disabled || isStreaming || isUploading || attachments.length >= 10} onClick={() => inputRef.current?.click()} title={acceptsAttachments ? 'Attach files (Gemini only, up to 10)' : 'Attachments are available with Gemini chats only'} type="button"><Paperclip size={18} /></button>
+          <button aria-label="Attach files" className="grid size-10 shrink-0 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#d8f36a] disabled:cursor-not-allowed disabled:opacity-40" disabled={!acceptsAttachments || disabled || isStreaming || isUploading || attachments.length >= 10} onClick={() => inputRef.current?.click()} title={acceptsAttachments ? 'Attach files' : 'Choose Gemini to attach files'} type="button"><Paperclip size={18} /></button>
           <textarea aria-label="Message" className="max-h-48 min-h-12 min-w-0 flex-1 resize-y bg-transparent px-1 py-2 text-[15px] leading-6 text-[#f4f0e8] outline-none placeholder:text-[#777a72] disabled:opacity-60" disabled={disabled || isStreaming} maxLength={10000} onChange={(event) => setContent(event.target.value)} onKeyDown={handleKeyDown} placeholder="Write a message..." value={content} />
           {isStreaming ? <button aria-label="Stop response" className="grid size-10 shrink-0 place-items-center bg-[#f07865] text-[#171310] transition hover:bg-[#ff9582]" onClick={onStop} title="Stop response" type="button"><Square size={15} fill="currentColor" /></button> : <button aria-label="Send message" className="grid size-10 shrink-0 place-items-center bg-[#d8f36a] text-[#111310] transition hover:bg-[#e5ff85] disabled:bg-white/10 disabled:text-[#777a72]" disabled={!canSend} title="Send message" type="submit"><ArrowUp size={18} /></button>}
         </div>
         <div className="mt-2 flex min-h-5 items-center justify-center text-center text-[11px] text-[#777a72]">
-          <span aria-live="polite" className={error || attachmentError ? 'text-[#f07865]' : ''}>{error || attachmentError || (isUploading ? 'Uploading attachments...' : !acceptsAttachments ? 'Attachments are available with Gemini chats only.' : content.length > 0 ? `${content.length.toLocaleString()} / 10,000` : 'AIRA can make mistakes. Check important details.')}</span>
+          <span aria-live="polite" className={error || attachmentError ? 'text-[#f07865]' : ''}>{error || attachmentError || (isUploading ? 'Uploading attachments...' : 'AIRA can make mistakes. Check important details.')}</span>
         </div>
       </form>
     </div>

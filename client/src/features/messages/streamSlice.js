@@ -19,6 +19,13 @@ const streamSlice = createSlice({
       state.content = ''
       state.status = 'streaming'
     },
+    startRetryStream(state, action) {
+      state.chatId = action.payload.chatId
+      state.prompt = ''
+      state.attachments = []
+      state.content = ''
+      state.status = 'streaming'
+    },
     appendStreamChunk(state, action) {
       if (state.chatId === action.payload.chatId && state.status === 'streaming') {
         state.content += action.payload.content
@@ -32,5 +39,5 @@ const streamSlice = createSlice({
   },
 })
 
-export const { startStream, appendStreamChunk, clearStream } = streamSlice.actions
+export const { startStream, startRetryStream, appendStreamChunk, clearStream } = streamSlice.actions
 export default streamSlice.reducer

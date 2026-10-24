@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Archive, ChevronDown, ChevronUp, Menu, MessageSquarePlus, PanelLeft, Search, Settings2, Sparkles, X } from 'lucide-react'
-import { Link, Outlet, useNavigate, useParams } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { useGetChatQuery, useGetChatsQuery, useCreateChatMutation } from '../features/chats/chatsApi.js'
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useDispatch, useSelector } from 'react-redux'
+import { useGetChatQuery, useGetChatsQuery, useCreateChatMutation, useUpdateChatMutation } from '../features/chats/chatsApi.js'
 import ChatListItem from '../features/chats/components/ChatListItem.jsx'
+import ProviderSwitcher from '../features/chats/components/ProviderSwitcher.jsx'
 import { getErrorMessage } from '../services/api/apiError.js'
 import { ROUTES } from '../constants/routes.js'
+import { modelDefaults, setProvider } from '../features/chats/chatUiSlice.js'
 
 const ChatLayout = () => {
   const [search, setSearch] = useState('')
@@ -13,16 +15,23 @@ const ChatLayout = () => {
   const [page, setPage] = useState(1)
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
   const { provider, model } = useSelector((state) => state.chatUi)
+  const dispatch = useDispatch()
+  const location = useLocation()
   const { chatId } = useParams()
-  const { data: selectedChat } = useGetChatQuery(chatId, { skip: !chatId })
+  const { data: selectedChat, isLoading: isChatLoading } = useGetChatQuery(chatId, { skip: !chatId })
   const { data, isLoading, error } = useGetChatsQuery({ page, limit: 30, search: searchTerm || undefined })
   const [createChat, createState] = useCreateChatMutation()
+  const [updateChat, updateChatState] = useUpdateChatMutation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [providerError, setProviderError] = useState('')
+  const touchStartRef = useRef(null)
   const navigate = useNavigate()
   const chats = data?.items || []
   const sidebarCollapsed = !sidebarExpanded && !sidebarOpen
   const activeProvider = selectedChat?.provider || provider
+  const isChatPage = location.pathname === ROUTES.chats || (location.pathname.startsWith(`${ROUTES.chats}/`) && location.pathname !== `${ROUTES.chats}/archived`)
+  const isChatStreaming = useSelector((state) => state.messageStream.chatId === chatId && state.messageStream.status === 'streaming')
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -43,8 +52,46 @@ const ChatLayout = () => {
     }
   }
 
+  const changeProvider = async (nextProvider) => {
+    if (nextProvider === activeProvider) return
+    const previousProvider = activeProvider
+    dispatch(setProvider(nextProvider))
+    setProviderError('')
+    if (!chatId) return
+
+    try {
+      await updateChat({ chatId, provider: nextProvider, model: modelDefaults[nextProvider] }).unwrap()
+    } catch (error) {
+      dispatch(setProvider(previousProvider))
+      setProviderError(getErrorMessage(error, 'Could not change the AI provider.'))
+    }
+  }
+
+  const trackDrawerSwipe = (event) => {
+    const touch = event.touches[0]
+    if (!touch || (!sidebarOpen && touch.clientX > 24)) {
+      touchStartRef.current = null
+      return
+    }
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  const handleDrawerSwipe = (event) => {
+    const start = touchStartRef.current
+    const touch = event.changedTouches[0]
+    touchStartRef.current = null
+    if (!start || !touch) return
+
+    const horizontalDistance = touch.clientX - start.x
+    const verticalDistance = touch.clientY - start.y
+    if (Math.abs(verticalDistance) > 48 || Math.abs(horizontalDistance) < 64) return
+
+    if (!sidebarOpen && horizontalDistance > 0) setSidebarOpen(true)
+    if (sidebarOpen && horizontalDistance < 0) setSidebarOpen(false)
+  }
+
   return (
-    <div className="flex h-dvh min-h-0 w-full overflow-hidden bg-[#111310]">
+    <div className="flex h-dvh min-h-0 w-full overflow-hidden bg-[#111310]" onTouchEnd={handleDrawerSwipe} onTouchStart={trackDrawerSwipe}>
       {sidebarOpen && <button aria-label="Close navigation" className="fixed inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <aside className={`fixed inset-y-0 left-0 z-30 flex w-71.5 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#191b17] transition-transform lg:relative lg:inset-auto lg:z-auto lg:h-full lg:translate-x-0 lg:transition-[width] lg:duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'sidebar-compact' : 'sidebar-expanded'}`} onMouseEnter={() => setSidebarExpanded(true)}>
         <div className={`flex h-18 min-h-18 shrink-0 items-center border-b border-white/10 ${sidebarCollapsed ? 'justify-center gap-0 px-1' : 'justify-between px-5'}`}>
@@ -80,7 +127,8 @@ const ChatLayout = () => {
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-18 min-h-18 shrink-0 items-center justify-between border-b border-white/10 px-5 sm:px-8">
           <button aria-label="Open navigation" className="text-[#92958c] hover:text-[#f4f0e8] lg:hidden" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
-          <div className="ml-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#92958c]"><span aria-hidden="true" className={`size-1.5 rounded-full ${activeProvider === 'GROQ' ? 'bg-[#d8f36a]' : 'bg-[#70b9ed]'}`} /><span>{activeProvider === 'GEMINI' ? 'Gemini active' : 'Groq active'}</span></div>
+          {isChatPage && providerError && <p aria-live="polite" className="ml-auto mr-3 max-w-64 text-right text-xs leading-5 text-[#f07865]">{providerError}</p>}
+          {isChatPage && <div className={providerError ? '' : 'ml-auto'}><ProviderSwitcher disabled={updateChatState.isLoading || isChatStreaming || (Boolean(chatId) && isChatLoading)} onChange={changeProvider} value={activeProvider} /></div>}
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden"><Outlet /></main>
       </div>

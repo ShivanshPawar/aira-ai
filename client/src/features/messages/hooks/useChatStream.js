@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { apiSlice } from '../../../services/api/apiSlice.js'
-import { streamChatMessage } from '../../../services/streaming/chatStream.js'
+import { retryChatMessage, streamChatMessage } from '../../../services/streaming/chatStream.js'
 import { authApi } from '../../auth/authApi.js'
-import { startStream, appendStreamChunk, clearStream } from '../streamSlice.js'
+import { startStream, startRetryStream, appendStreamChunk, clearStream } from '../streamSlice.js'
 import { messagesApi } from '../messagesApi.js'
 
 export const useChatStream = (chatId) => {
@@ -19,13 +19,13 @@ export const useChatStream = (chatId) => {
     return () => controllerRef.current?.abort()
   }, [chatId])
 
-  const start = (content, attachments = []) => {
+  const runStream = (startAction, send) => {
     if (!chatId || !accessToken || controllerRef.current) return false
 
     setError('')
     const controller = new AbortController()
     controllerRef.current = controller
-    dispatch(startStream({ chatId, content, attachments }))
+    dispatch(startAction)
 
     const reconcile = async () => {
       dispatch(apiSlice.util.invalidateTags([
@@ -43,10 +43,7 @@ export const useChatStream = (chatId) => {
 
     const run = async () => {
       try {
-        await streamChatMessage({
-          chatId,
-          content,
-          attachments: attachments.map(({ _id }) => _id),
+        await send({
           accessToken,
           signal: controller.signal,
           refreshAccessToken: async () => {
@@ -70,10 +67,26 @@ export const useChatStream = (chatId) => {
     return true
   }
 
+  const start = (content, attachments = []) => runStream(
+    startStream({ chatId, content, attachments }),
+    (options) => streamChatMessage({
+      ...options,
+      chatId,
+      content,
+      attachments: attachments.map(({ _id }) => _id),
+    }),
+  )
+
+  const retry = (messageId) => runStream(
+    startRetryStream({ chatId }),
+    (options) => retryChatMessage({ ...options, messageId }),
+  )
+
   const stop = () => controllerRef.current?.abort()
 
   return {
     start,
+    retry,
     stop,
     isStreaming,
     streamingPrompt: isStreaming ? stream.prompt : '',

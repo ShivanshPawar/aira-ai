@@ -1,21 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, FileText } from 'lucide-react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Check, Copy, FileText, Pencil, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter'
-import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash'
-import css from 'react-syntax-highlighter/dist/esm/languages/prism/css'
-import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript'
-import json from 'react-syntax-highlighter/dist/esm/languages/prism/json'
-import python from 'react-syntax-highlighter/dist/esm/languages/prism/python'
-import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-
-SyntaxHighlighter.registerLanguage('bash', bash)
-SyntaxHighlighter.registerLanguage('css', css)
-SyntaxHighlighter.registerLanguage('javascript', javascript)
-SyntaxHighlighter.registerLanguage('json', json)
-SyntaxHighlighter.registerLanguage('python', python)
-SyntaxHighlighter.registerLanguage('typescript', typescript)
+import remarkGfm from 'remark-gfm'
+import MessageEditForm from './MessageEditForm.jsx'
+const CodeHighlighter = lazy(() => import('./CodeHighlighter.jsx'))
 
 const CodeBlock = ({ language, code }) => {
   const [copied, setCopied] = useState(false)
@@ -31,24 +19,34 @@ const CodeBlock = ({ language, code }) => {
   }
 
   return (
-    <div className="relative my-3 min-w-0 max-w-full overflow-hidden">
-      <button aria-label={copied ? 'Code copied' : 'Copy code'} className="absolute right-2 top-2 z-10 grid size-8 place-items-center bg-[#30342b] text-[#d7d9ce] hover:bg-[#41463a] hover:text-white" onClick={copyCode} title={copied ? 'Copied' : 'Copy code'} type="button">
+    <div className="relative my-4 min-w-0 max-w-full overflow-hidden border border-white/10 bg-[#161815] shadow-[0_12px_30px_rgb(0_0_0_/_18%)]">
+      <div className="flex h-10 items-center justify-between border-b border-white/10 bg-[#20231e] pl-3 pr-1.5">
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#a9aca3]">{language || 'Code'}</span>
+        <button aria-label={copied ? 'Code copied' : 'Copy code'} className="flex h-7 items-center gap-1.5 px-2 text-[11px] text-[#d7d9ce] transition hover:bg-white/10 hover:text-white" onClick={copyCode} title={copied ? 'Copied' : 'Copy code'} type="button">
         {copied ? <Check size={15} /> : <Copy size={15} />}
-      </button>
-      <SyntaxHighlighter customStyle={{ maxWidth: '100%', margin: 0, overflowX: 'hidden', overflowWrap: 'anywhere', padding: '2.8rem 1rem 1rem', whiteSpace: 'pre-wrap', fontSize: '13px', lineHeight: 1.6 }} language={language} style={oneDark} PreTag="div" wrapLongLines>
-        {code}
-      </SyntaxHighlighter>
+          <span>{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+      <Suspense fallback={<pre className="overflow-x-auto p-4 font-mono text-[13px] leading-6 text-[#d7d9ce]"><code>{code}</code></pre>}>
+        <CodeHighlighter code={code} language={language} />
+      </Suspense>
     </div>
   )
 }
 
+const normalizeMarkdownTables = (content) => content.split('\n').map((line) => (
+  /\|\s*:?-{3,}:?\s*\|/.test(line) ? line.replace(/\|\|/g, '|\n|') : line
+)).join('\n')
+
 const Markdown = ({ content }) => (
   <ReactMarkdown
+    remarkPlugins={[remarkGfm]}
     components={{
       code({ className, children, ...props }) {
         const language = /language-(\w+)/.exec(className || '')?.[1]
-        if (language) {
-          return <CodeBlock code={String(children).replace(/\n$/, '')} language={language} />
+        const content = String(children).replace(/\n$/, '')
+        if (language || String(children).includes('\n')) {
+          return <CodeBlock code={content} language={language} />
         }
         return <code className="message-inline-code rounded-sm bg-white/10 px-1 py-0.5 font-mono text-[0.92em] text-[#d8f36a]" {...props}>{children}</code>
       },
@@ -57,9 +55,66 @@ const Markdown = ({ content }) => (
       },
     }}
   >
-    {content}
+    {normalizeMarkdownTables(content)}
   </ReactMarkdown>
 )
+
+const useStreamedText = (text) => {
+  const [displayedText, setDisplayedText] = useState('')
+  const displayedTextRef = useRef('')
+  const targetTextRef = useRef('')
+  const animationFrameRef = useRef(null)
+  const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || false)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    if (!mediaQuery) return undefined
+    const updatePreference = () => setReducedMotion(mediaQuery.matches)
+    mediaQuery.addEventListener('change', updatePreference)
+    return () => mediaQuery.removeEventListener('change', updatePreference)
+  }, [])
+
+  useEffect(() => {
+    targetTextRef.current = text
+    if (reducedMotion) {
+      displayedTextRef.current = text
+      setDisplayedText(text)
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+      return undefined
+    }
+
+    if (!text.startsWith(displayedTextRef.current)) {
+      displayedTextRef.current = ''
+      setDisplayedText('')
+    }
+
+    const reveal = () => {
+      animationFrameRef.current = null
+      const target = targetTextRef.current
+      const visible = displayedTextRef.current
+      const remaining = target.length - visible.length
+      if (remaining <= 0) return
+
+      const step = Math.min(remaining, Math.max(1, Math.ceil(remaining / 16)))
+      const nextText = visible + target.slice(visible.length, visible.length + step)
+      displayedTextRef.current = nextText
+      setDisplayedText(nextText)
+      animationFrameRef.current = requestAnimationFrame(reveal)
+    }
+
+    if (!animationFrameRef.current && text.length > displayedTextRef.current.length) {
+      animationFrameRef.current = requestAnimationFrame(reveal)
+    }
+    return undefined
+  }, [reducedMotion, text])
+
+  useEffect(() => () => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current)
+  }, [])
+
+  return displayedText
+}
 
 const AttachmentList = ({ attachments = [] }) => attachments.length > 0 && (
   <ul aria-label="Message attachments" className="mt-3 flex flex-wrap gap-2">
@@ -71,46 +126,82 @@ const AttachmentList = ({ attachments = [] }) => attachments.length > 0 && (
   </ul>
 )
 
-const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPrompt = '', streamingAttachments = [], streamingText = '' }) => {
-  const bottomRef = useRef(null)
+const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPrompt = '', streamingAttachments = [], streamingText = '', actionError = '', actionsDisabled = false, onEditMessage, onRegenerate, onRetry, onDelete }) => {
+  const scrollRegionRef = useRef(null)
+  const shouldFollowStreamRef = useRef(true)
+  const [editingMessageId, setEditingMessageId] = useState(null)
+  const [copiedMessageId, setCopiedMessageId] = useState(null)
+  const copyTimeoutRef = useRef(null)
+  const actionsUnavailable = actionsDisabled || isStreaming || Boolean(editingMessageId)
+  const displayedStreamingText = useStreamedText(streamingText)
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
-  }, [messages, streamingText, isStreaming])
+  useLayoutEffect(() => {
+    const scrollRegion = scrollRegionRef.current
+    if (scrollRegion && shouldFollowStreamRef.current) scrollRegion.scrollTop = scrollRegion.scrollHeight
+  }, [displayedStreamingText, isStreaming, messages])
+
+  const trackScrollPosition = () => {
+    const scrollRegion = scrollRegionRef.current
+    if (!scrollRegion) return
+    shouldFollowStreamRef.current = scrollRegion.scrollHeight - scrollRegion.scrollTop - scrollRegion.clientHeight < 96
+  }
+
+  useEffect(() => () => window.clearTimeout(copyTimeoutRef.current), [])
+
+  const copyMessage = async (messageId, content) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+      window.clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = window.setTimeout(() => setCopiedMessageId(null), 1400)
+    } catch {
+      setCopiedMessageId(null)
+    }
+  }
 
   if (isLoading) return <div className="grid flex-1 place-items-center text-sm text-[#92958c]">Loading conversation...</div>
 
   return (
-    <div className="message-scroll-region scrollbar-hidden min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 sm:px-8">
+    <div className="message-scroll-region scrollbar-hidden min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 sm:px-8" onScroll={trackScrollPosition} ref={scrollRegionRef}>
       <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-9">
-        {messages.length === 0 && <div className="py-16 text-center"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#d8f36a]">A fresh page</p><p className="mt-3 text-2xl font-semibold text-[#f4f0e8]">Start wherever your mind is.</p></div>}
-        {messages.map((message) => {
+        {actionError && <p aria-live="polite" className="border-l-2 border-[#f07865] bg-[#f07865]/10 px-3 py-2 text-sm leading-6 text-[#f5a89b]">{actionError}</p>}
+        {messages.length === 0 && <div className="py-16 text-center"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#d8f36a]">Let's go buddy</p><p className="mt-3 text-2xl font-semibold text-[#f4f0e8]">Start wherever your mind is.</p></div>}
+        {messages.map((message, index) => {
           const isUser = message.role === 'USER'
-          return <article className={`flex w-full min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`} key={message._id}>
-            <div className={`min-w-0 max-w-[min(100%,680px)] ${isUser ? 'border border-white/10 bg-[#1c1e1a] px-4 py-3' : 'w-full'}`}>
-              <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#777a72]">{isUser ? 'You' : 'Aira'}{message.status && message.status !== 'COMPLETED' && <span className="ml-2 text-[#f07865]">{message.status.toLowerCase()}</span>}</div>
-              <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">
+          const isLatest = index === messages.length - 1
+          const canRegenerate = isLatest && message.role === 'ASSISTANT' && message.status === 'COMPLETED'
+          const canRetry = isLatest && message.role === 'ASSISTANT' && ['FAILED', 'CANCELLED'].includes(message.status)
+          const isEditing = editingMessageId === message._id
+
+          return <article className={`group flex w-full min-w-0 flex-col ${isUser ? 'items-end' : 'items-start'}`} key={message._id}>
+            <div className={`min-w-0 ${isUser ? 'max-w-[min(100%,680px)] border border-white/10 bg-[#1c1e1a] px-4 py-3' : 'w-full max-w-none rounded-lg bg-[#191b17]/35 px-4 py-4 sm:px-5'}`}>
+              {!isUser && <div className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[#9fa39a]">Aira{message.status && message.status !== 'COMPLETED' && <span className="ml-2 text-[#f07865]">{message.status.toLowerCase()}</span>}</div>}
+              {isEditing ? <MessageEditForm disabled={actionsDisabled || isStreaming} message={message} onCancel={() => setEditingMessageId(null)} onSave={onEditMessage} /> : <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">
                 {message.content ? <Markdown content={message.content} /> : <span className="text-[#777a72]">No response text.</span>}
-              </div>
+              </div>}
               <AttachmentList attachments={message.attachments} />
               {message.metadata?.error?.message && <p className="mt-3 border-l-2 border-[#f07865] pl-3 text-xs leading-5 text-[#f5a89b]">{message.metadata.error.message}</p>}
             </div>
+            {!isEditing && <div className={`mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${isUser ? 'justify-end' : 'justify-start'}`}>
+              <button aria-label={copiedMessageId === message._id ? 'Message copied' : `Copy ${isUser ? 'message' : 'response'}`} className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={!message.content} onClick={() => copyMessage(message._id, message.content)} title={copiedMessageId === message._id ? 'Copied' : 'Copy'} type="button">{copiedMessageId === message._id ? <Check size={15} /> : <Copy size={15} />}</button>
+              {isUser && <button aria-label="Edit and resend message" className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => setEditingMessageId(message._id)} title="Edit and resend" type="button"><Pencil size={15} /></button>}
+              {canRegenerate && <button aria-label="Regenerate response" className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRegenerate(message._id)} title="Regenerate response" type="button"><RotateCw size={15} /></button>}
+              {canRetry && <button aria-label="Retry response" className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRetry(message._id)} title="Retry response" type="button"><RotateCcw size={15} /></button>}
+              <button aria-label={`Delete ${isUser ? 'message' : 'response'}`} className="grid size-8 place-items-center text-[#92958c] hover:bg-[#f07865]/10 hover:text-[#f07865] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onDelete(message._id)} title="Delete message" type="button"><Trash2 size={15} /></button>
+            </div>}
           </article>
         })}
         {isStreaming && streamingPrompt && <article className="flex w-full min-w-0 justify-end">
           <div className="min-w-0 max-w-[min(100%,680px)] border border-white/10 bg-[#1c1e1a] px-4 py-3">
-            <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#777a72]">You</div>
             <div className="whitespace-pre-wrap text-sm leading-7 text-[#e8e5dc]">{streamingPrompt}</div>
             <AttachmentList attachments={streamingAttachments} />
           </div>
         </article>}
-        {isStreaming && <article aria-live="polite" className="flex w-full min-w-0 justify-start">
-          <div className="w-full min-w-0">
-            <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.16em] text-[#d8f36a]">Aira / responding</div>
-            <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">{streamingText ? <Markdown content={streamingText} /> : <span className="text-[#777a72]">Thinking...</span>}</div>
+        {isStreaming && <article className="flex w-full min-w-0 justify-start">
+          <div className="w-full min-w-0 rounded-lg bg-[#191b17]/35 px-4 py-4 sm:px-5">
+            <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">{displayedStreamingText ? <Markdown content={displayedStreamingText} /> : <span aria-label="Aira is thinking" className="inline-flex items-center gap-1 text-[#92958c]"><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" /><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" /><span className="size-1.5 animate-bounce rounded-full bg-current" /></span>}</div>
           </div>
         </article>}
-        <div ref={bottomRef} />
       </div>
     </div>
   )
