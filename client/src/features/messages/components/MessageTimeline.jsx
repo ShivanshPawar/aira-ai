@@ -19,7 +19,7 @@ const CodeBlock = ({ language, code }) => {
   }
 
   return (
-    <div className="relative my-4 min-w-0 max-w-full overflow-hidden border border-white/10 bg-[#161815] shadow-[0_12px_30px_rgb(0_0_0_/_18%)]">
+    <div className="relative my-4 min-w-0 max-w-full overflow-hidden border border-white/10 bg-[#161815] shadow-[0_12px_30px_rgb(0_0_0/18%)]">
       <div className="flex h-10 items-center justify-between border-b border-white/10 bg-[#20231e] pl-3 pr-1.5">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#a9aca3]">{language || 'Code'}</span>
         <button aria-label={copied ? 'Code copied' : 'Copy code'} className="flex h-7 items-center gap-1.5 px-2 text-[11px] text-[#d7d9ce] transition hover:bg-white/10 hover:text-white" onClick={copyCode} title={copied ? 'Copied' : 'Copy code'} type="button">
@@ -48,7 +48,7 @@ const Markdown = ({ content }) => (
         if (language || String(children).includes('\n')) {
           return <CodeBlock code={content} language={language} />
         }
-        return <code className="message-inline-code rounded-sm bg-white/10 px-1 py-0.5 font-mono text-[0.92em] text-[#d8f36a]" {...props}>{children}</code>
+        return <code className="message-inline-code bg-white/10 px-1 py-0.5 font-mono text-[0.92em] text-[#d8f36a]" {...props}>{children}</code>
       },
       a({ children, ...props }) {
         return <a className="text-[#70b9ed] underline underline-offset-4" rel="noreferrer" target="_blank" {...props}>{children}</a>
@@ -126,13 +126,13 @@ const AttachmentList = ({ attachments = [] }) => attachments.length > 0 && (
   </ul>
 )
 
-const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPrompt = '', streamingAttachments = [], streamingText = '', actionError = '', actionsDisabled = false, onEditMessage, onRegenerate, onRetry, onDelete }) => {
+const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPrompt = '', streamingAttachments = [], streamingText = '', actionError = '', onEditMessage, onRegenerate, onRetry, onDelete }) => {
   const scrollRegionRef = useRef(null)
   const shouldFollowStreamRef = useRef(true)
   const [editingMessageId, setEditingMessageId] = useState(null)
   const [copiedMessageId, setCopiedMessageId] = useState(null)
   const copyTimeoutRef = useRef(null)
-  const actionsUnavailable = actionsDisabled || isStreaming || Boolean(editingMessageId)
+  const actionsUnavailable = Boolean(editingMessageId)
   const displayedStreamingText = useStreamedText(streamingText)
 
   useLayoutEffect(() => {
@@ -155,7 +155,18 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
       window.clearTimeout(copyTimeoutRef.current)
       copyTimeoutRef.current = window.setTimeout(() => setCopiedMessageId(null), 1400)
     } catch {
-      setCopiedMessageId(null)
+      const fallback = document.createElement('textarea')
+      fallback.value = content
+      fallback.setAttribute('readonly', '')
+      fallback.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+      document.body.appendChild(fallback)
+      fallback.select()
+      const copied = document.execCommand('copy')
+      fallback.remove()
+      if (!copied) return
+      setCopiedMessageId(messageId)
+      window.clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = window.setTimeout(() => setCopiedMessageId(null), 1400)
     }
   }
 
@@ -174,20 +185,20 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
           const isEditing = editingMessageId === message._id
 
           return <article className={`group flex w-full min-w-0 flex-col ${isUser ? 'items-end' : 'items-start'}`} key={message._id}>
-            <div className={`min-w-0 ${isUser ? 'max-w-[min(100%,680px)] border border-white/10 bg-[#1c1e1a] px-4 py-3' : 'w-full max-w-none rounded-lg bg-[#191b17]/35 px-4 py-4 sm:px-5'}`}>
+            <div className={`min-w-0 ${isUser ? `${isEditing ? 'w-full max-w-none' : 'max-w-[min(100%,680px)]'} border border-white/10 bg-[#1c1e1a] px-4 py-3` : 'w-full max-w-none bg-[#191b17]/35 px-4 py-4 sm:px-5'}`}>
               {!isUser && <div className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[#9fa39a]">Aira{message.status && message.status !== 'COMPLETED' && <span className="ml-2 text-[#f07865]">{message.status.toLowerCase()}</span>}</div>}
-              {isEditing ? <MessageEditForm disabled={actionsDisabled || isStreaming} message={message} onCancel={() => setEditingMessageId(null)} onSave={onEditMessage} /> : <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">
-                {message.content ? <Markdown content={message.content} /> : <span className="text-[#777a72]">No response text.</span>}
+              {isEditing ? <MessageEditForm disabled={isStreaming} message={message} onCancel={() => setEditingMessageId(null)} onSave={onEditMessage} /> : <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">
+                {message.content?.trim() && <Markdown content={message.content} />}
               </div>}
               <AttachmentList attachments={message.attachments} />
               {message.metadata?.error?.message && <p className="mt-3 border-l-2 border-[#f07865] pl-3 text-xs leading-5 text-[#f5a89b]">{message.metadata.error.message}</p>}
             </div>
             {!isEditing && <div className={`mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${isUser ? 'justify-end' : 'justify-start'}`}>
               <button aria-label={copiedMessageId === message._id ? 'Message copied' : `Copy ${isUser ? 'message' : 'response'}`} className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={!message.content} onClick={() => copyMessage(message._id, message.content)} title={copiedMessageId === message._id ? 'Copied' : 'Copy'} type="button">{copiedMessageId === message._id ? <Check size={15} /> : <Copy size={15} />}</button>
-              {isUser && <button aria-label="Edit and resend message" className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => setEditingMessageId(message._id)} title="Edit and resend" type="button"><Pencil size={15} /></button>}
-              {canRegenerate && <button aria-label="Regenerate response" className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRegenerate(message._id)} title="Regenerate response" type="button"><RotateCw size={15} /></button>}
-              {canRetry && <button aria-label="Retry response" className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRetry(message._id)} title="Retry response" type="button"><RotateCcw size={15} /></button>}
-              <button aria-label={`Delete ${isUser ? 'message' : 'response'}`} className="grid size-8 place-items-center text-[#92958c] hover:bg-[#f07865]/10 hover:text-[#f07865] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onDelete(message._id)} title="Delete message" type="button"><Trash2 size={15} /></button>
+              {isUser && <button aria-label="Edit and resend message" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => setEditingMessageId(message._id)} title="Edit and resend" type="button"><Pencil size={15} /></button>}
+              {canRegenerate && <button aria-label="Regenerate response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRegenerate(message._id)} title="Regenerate response" type="button"><RotateCw size={15} /></button>}
+              {canRetry && <button aria-label="Retry response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRetry(message._id)} title="Retry response" type="button"><RotateCcw size={15} /></button>}
+              <button aria-label={`Delete ${isUser ? 'message' : 'response'}`} className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-[#f07865]/10 hover:text-[#f07865] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onDelete(message._id)} title="Delete message" type="button"><Trash2 size={15} /></button>
             </div>}
           </article>
         })}
@@ -198,7 +209,7 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
           </div>
         </article>}
         {isStreaming && <article className="flex w-full min-w-0 justify-start">
-          <div className="w-full min-w-0 rounded-lg bg-[#191b17]/35 px-4 py-4 sm:px-5">
+          <div className="w-full min-w-0 bg-[#191b17]/35 px-4 py-4 sm:px-5">
             <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">{displayedStreamingText ? <Markdown content={displayedStreamingText} /> : <span aria-label="Aira is thinking" className="inline-flex items-center gap-1 text-[#92958c]"><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" /><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" /><span className="size-1.5 animate-bounce rounded-full bg-current" /></span>}</div>
           </div>
         </article>}

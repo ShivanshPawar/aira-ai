@@ -21,19 +21,18 @@ const MessageEditForm = ({ message, disabled = false, onCancel, onSave }) => {
   }
 
   return (
-    <form className="space-y-2" onSubmit={submit}>
+    <form className="space-y-3" onSubmit={submit}>
       <textarea
         aria-label="Edit message"
         autoFocus
-        className="min-h-28 w-full resize-y border border-white/20 bg-[#111310] p-3 text-sm leading-6 text-[#f4f0e8] outline-none focus:border-[#d8f36a]"
+        className="min-h-10 w-full resize-y border border-white/15 bg-[#111310] p-4 text-[15px] leading-7 text-[#f4f0e8] outline-none transition focus:border-[#d8f36a]"
         maxLength={10000}
         onChange={(event) => setContent(event.target.value)}
         value={content}
       />
-      <p className="text-xs leading-5 text-[#f5a89b]">Saving removes all later messages in this conversation.</p>
       <div className="flex justify-end gap-2">
-        <button className="flex h-9 items-center gap-1.5 px-3 text-xs text-[#92958c] hover:text-[#f4f0e8]" disabled={disabled} onClick={onCancel} type="button"><X size={14} />Cancel</button>
-        <button className="flex h-9 items-center gap-1.5 bg-[#d8f36a] px-3 text-xs font-semibold text-[#171912] disabled:opacity-50" disabled={!canSave} type="submit"><Check size={14} />Save and resend</button>
+        <button aria-label="Cancel edit" className="grid size-10 place-items-center text-[#92958c] transition hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-50" disabled={disabled} onClick={onCancel} title="Cancel edit" type="button"><X size={18} /></button>
+        <button aria-label="Save and resend" className="grid size-10 place-items-center bg-[#d8f36a] text-[#171912] transition hover:bg-[#e5ff85] disabled:opacity-50" disabled={!canSave} title="Save and resend" type="submit"><Check size={18} /></button>
       </div>
     </form>
   )

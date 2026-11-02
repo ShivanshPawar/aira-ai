@@ -21,6 +21,12 @@ const app = express();
 
 // Apply security, parsing, and request-wide policies before any route can run.
 
+// Render forwards public requests through one trusted proxy. This restores the
+// originating client IP for the global rate limiter and secure-cookie behavior.
+if (env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(helmet());
 
 app.use(

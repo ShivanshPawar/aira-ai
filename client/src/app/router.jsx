@@ -5,6 +5,7 @@ import AuthPage from '../features/auth/pages/AuthPage.jsx'
 import ChatWorkspacePage from '../features/chats/pages/ChatWorkspacePage.jsx'
 import ArchivedChatsPage from '../features/chats/pages/ArchivedChatsPage.jsx'
 import SettingsPage from '../features/chats/pages/SettingsPage.jsx'
+import ProfilePage from '../features/auth/pages/ProfilePage.jsx'
 import NotFoundPage from '../pages/NotFoundPage.jsx'
 import ProtectedRoute from '../routes/ProtectedRoute.jsx'
 import PublicOnlyRoute from '../routes/PublicOnlyRoute.jsx'
@@ -25,6 +26,7 @@ const AppRouter = () => (
           <Route path={`${ROUTES.chats}/archived`} element={<ArchivedChatsPage />} />
           <Route path={`${ROUTES.chats}/:chatId`} element={<ChatWorkspacePage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path={ROUTES.profile} element={<ProfilePage />} />
         </Route>
       </Route>
       <Route path="/" element={<Navigate to={ROUTES.chats} replace />} />

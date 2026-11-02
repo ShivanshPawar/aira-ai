@@ -1,4 +1,3 @@
-import { ArrowUpRight, Sparkles } from 'lucide-react'
 import { Link, Outlet } from 'react-router-dom'
 import { ROUTES } from '../constants/routes.js'
 
@@ -12,7 +11,7 @@ const AuthLayout = () => (
       />
       <div className="absolute inset-0 bg-linear-to-t from-[#111310] via-[#111310]/20 to-[#111310]/90" />
       <Link className="absolute left-10 top-9 flex items-center gap-3" to={ROUTES.login}>
-        <span className="grid size-9 place-items-center text-[#d8f36a]"><Sparkles size={25} /></span>
+        <img alt="Aira AI" className="size-9 object-contain" src="/logo.png" />
         <span className="text-sm font-extrabold tracking-[0.16em]">AIRA AI</span>
       </Link>
       <div className="absolute bottom-12 left-10 right-10">
@@ -24,7 +23,7 @@ const AuthLayout = () => (
     <section className="flex min-h-screen flex-col px-6 py-7 sm:px-10 lg:px-16">
       <header className="flex items-center justify-between lg:justify-end">
         <Link className="flex items-center gap-2 text-sm font-extrabold tracking-[0.16em] lg:hidden" to={ROUTES.login}>
-          <span className="grid size-8 place-items-center bg-[#d8f36a] text-[#111310]"><Sparkles size={16} /></span>AIRA
+          <img alt="Aira AI" className="size-8 object-contain" src="/logo.png" />AIRA
         </Link>
       </header>
       <div className="mx-auto flex w-full max-w-102.5 flex-1 flex-col justify-center py-12"><Outlet /></div>

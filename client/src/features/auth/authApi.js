@@ -51,6 +51,13 @@ export const authApi = apiSlice.injectEndpoints({
       query: () => '/users/me',
       providesTags: ['CurrentUser'],
     }),
+    updateProfile: builder.mutation({
+      query: (body) => ({ url: '/users/me', method: 'PATCH', body }),
+      invalidatesTags: ['CurrentUser'],
+    }),
+    changePassword: builder.mutation({
+      query: (body) => ({ url: '/users/me/password', method: 'PATCH', body }),
+    }),
   }),
 })
 
@@ -60,4 +67,6 @@ export const {
   useRefreshSessionMutation,
   useLogoutMutation,
   useGetCurrentUserQuery,
+  useUpdateProfileMutation,
+  useChangePasswordMutation,
 } = authApi

@@ -17,7 +17,6 @@ const buildGroqMessages = (
 	conversation,
 	systemPrompt = null
 ) => {
-
 	const messages = conversation.map((message) => ({
 		role: toGroqRole(message.role),
 		content: message.content,

@@ -39,10 +39,16 @@ const generateResponse = async (
 
 		});
 
+		const content = response.choices[0]?.message?.content?.trim();
+
+		if (!content) {
+			throw new Error("Groq returned an empty response.");
+		}
+
 		// Convert Groq's response fields into the result shape used by the message service.
 		return createAIResponse({
 
-			content: response.choices[0].message.content,
+			content,
 
 			provider: options.provider,
 
@@ -104,6 +110,7 @@ const generateStream = async (
 
 			let finalUsage = null;
 			let finalFinishReason = null;
+			let receivedContent = false;
 
 			try {
 
@@ -115,6 +122,7 @@ const generateStream = async (
 						choice?.delta?.content ?? "";
 
 					if (content) {
+						receivedContent ||= Boolean(content.trim());
 						yield createTokenEvent(content);
 					}
 
@@ -138,6 +146,10 @@ const generateStream = async (
 				}
 
 				// Usage is only included in the final chunk when stream_options enables it.
+				if (!receivedContent) {
+					throw new Error("Groq returned an empty response.");
+				}
+
 				yield createDoneEvent({
 					finishReason: finalFinishReason,
 					usage: finalUsage,

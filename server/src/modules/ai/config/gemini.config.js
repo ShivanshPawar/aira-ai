@@ -4,7 +4,7 @@ export const GEMINI_CONFIG = {
 
 	provider: AI_PROVIDERS.GEMINI,
 
-	model: AI_MODELS.GEMINI_FLASH,
+	model: AI_MODELS.GEMINI_3_6_FLASH,
 
 	temperature: 0.7,
 

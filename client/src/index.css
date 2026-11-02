@@ -97,8 +97,8 @@ select option:hover {
     display: flex;
     width: 100%;
     align-items: center;
-    gap: 9px;
-    padding: 9px 12px;
+    gap: 8px;
+    padding: 7px 10px;
     color: #cbc8bf;
     font-size: 11px;
     text-align: left;
@@ -120,6 +120,27 @@ select option:hover {
 
 .scrollbar-hidden::-webkit-scrollbar {
     display: none;
+}
+
+.aira-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(216 243 106 / 55%) #111310;
+}
+
+.aira-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.aira-scrollbar::-webkit-scrollbar-track {
+    background: #111310;
+}
+
+.aira-scrollbar::-webkit-scrollbar-thumb {
+    background: rgb(216 243 106 / 55%);
+}
+
+.aira-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #d8f36a;
 }
 
 .message-markdown> :first-child {

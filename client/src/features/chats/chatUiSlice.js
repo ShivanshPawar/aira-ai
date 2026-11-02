@@ -1,8 +1,8 @@
 import { createSlice } from '@reduxjs/toolkit'
 
 const defaults = {
-  GROQ: 'groq/compound',
-  GEMINI: 'gemini-2.5-flash',
+  GROQ: 'openai/gpt-oss-20b',
+  GEMINI: 'gemini-3.6-flash',
 }
 
 const chatUiSlice = createSlice({

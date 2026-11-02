@@ -17,6 +17,12 @@ import { normalizeTokenUsage } from "../ai/utils/token-usage.js";
 const SUMMARY_INTERVAL = 20000;
 const activeChatMutations = new Set();
 
+const getDefaultModel = (provider) => {
+	return provider === AI_PROVIDERS.GEMINI
+		? AI_MODELS.GEMINI_3_6_FLASH
+		: DEFAULT_MODEL;
+};
+
 const withChatMutationLock = async (chatId, work) => {
 	// Serialize mutations per chat so overlapping streams cannot corrupt message order or counters.
 	const key = chatId.toString();
@@ -41,7 +47,7 @@ const createChat = async (userId, data) => {
 	const provider = data.provider ?? DEFAULT_PROVIDER;
 	const model =
 		data.model ??
-		(provider === AI_PROVIDERS.GEMINI ? AI_MODELS.GEMINI_FLASH : DEFAULT_MODEL);
+		getDefaultModel(provider);
 
 	// A provider/model pair is validated here as well as at the HTTP boundary for service safety.
 	if (!isSupportedModel(provider, model)) {
@@ -116,9 +122,7 @@ const updateChat = async (chatId, userId, updates) => {
 	const model =
 		updates.model ??
 		(updates.provider && updates.provider !== chat.provider
-			? provider === AI_PROVIDERS.GEMINI
-				? AI_MODELS.GEMINI_FLASH
-				: DEFAULT_MODEL
+			? getDefaultModel(provider)
 			: chat.model);
 
 	if (!isSupportedModel(provider, model)) {
@@ -167,7 +171,7 @@ const deleteChat = async (chatId, userId) => {
 };
 
 const verifyChatAccess = async (chatId, userId) => {
-	const chat = await chatRepository.findById(chatId);
+	let chat = await chatRepository.findById(chatId);
 
 	if (!chat) {
 		throw new ApiError(HTTP_STATUS.NOT_FOUND, "Chat not found.");
@@ -179,6 +183,14 @@ const verifyChatAccess = async (chatId, userId) => {
 			HTTP_STATUS.FORBIDDEN,
 			"You don't have access to this chat.",
 		);
+	}
+
+	// Retired model IDs can exist on chats created before a provider catalog changed.
+	// Move them to their provider's current default when their owner next opens or uses the chat.
+	if (!isSupportedModel(chat.provider, chat.model)) {
+		chat = await chatRepository.updateById(chatId, {
+			model: getDefaultModel(chat.provider),
+		});
 	}
 
 	return chat;

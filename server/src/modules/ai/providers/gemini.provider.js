@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 
 import { env } from "../../../config/env.js";
 import { buildGeminiMessages } from "../adapters/gemini.adapter.js";
+import { AI_MODELS } from "../ai.constants.js";
 import { createAIProviderContract } from "../contracts/ai-provider.contract.js";
 import { createAIResponse } from "../utils/ai-response.js";
 import {
@@ -32,7 +33,7 @@ const buildGenerationConfig = (options) => {
 };
 
 const generateResponse = async (conversation, options = {}) => {
-	const model = options.model || "gemini-2.5-flash";
+	const model = options.model || AI_MODELS.GEMINI_3_6_FLASH;
 
 	try {
 		// Gemini needs its own role and attachment shape, so adapt the neutral conversation first.
@@ -68,7 +69,7 @@ const generateResponse = async (conversation, options = {}) => {
 };
 
 const generateStream = async (conversation, options = {}) => {
-	const model = options.model || "gemini-2.5-flash";
+	const model = options.model || AI_MODELS.GEMINI_3_6_FLASH;
 
 	try {
 		const contents = await buildGeminiMessages(conversation);

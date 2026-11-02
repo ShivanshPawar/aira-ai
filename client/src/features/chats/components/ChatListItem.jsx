@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Archive, Check, MessageSquare, MoreHorizontal, Pencil, Pin, RotateCcw, Trash2, X } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -15,6 +15,7 @@ const ChatListItem = ({ chat, archived = false, compact = false, onNavigate = ()
   const [renaming, setRenaming] = useState(false)
   const [title, setTitle] = useState(chat.title || '')
   const [error, setError] = useState('')
+  const rootRef = useRef(null)
   const { chatId } = useParams()
   const navigate = useNavigate()
   const [renameChat, renameState] = useRenameChatMutation()
@@ -48,8 +49,17 @@ const ChatListItem = ({ chat, archived = false, compact = false, onNavigate = ()
     })
   }
 
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const closeOnOutsideClick = (event) => {
+      if (!rootRef.current?.contains(event.target)) setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [menuOpen])
+
   return (
-    <div className="group relative mb-1" onMouseLeave={() => setMenuOpen(false)}>
+    <div className="group relative mb-1" ref={rootRef}>
       {renaming ? (
         <form className="flex items-center gap-1 px-1 py-1" onSubmit={saveTitle}>
           <input aria-label="Conversation title" autoFocus className="min-w-0 flex-1 border border-white/20 bg-[#111310] px-2 py-2 text-xs text-[#f4f0e8] outline-none focus:border-[#d8f36a]" maxLength={100} onChange={(event) => setTitle(event.target.value)} value={title} />
@@ -63,11 +73,11 @@ const ChatListItem = ({ chat, archived = false, compact = false, onNavigate = ()
           </Link>
           {!compact && <>
             {chat.isPinned && <Pin aria-label="Pinned" className="mr-1 shrink-0 text-[#d8f36a]" size={12} />}
-            <button aria-label={`Actions for ${chat.title || 'conversation'}`} className="mr-1 shrink-0 p-2 text-[#777a72] hover:text-[#f4f0e8]" onClick={() => setMenuOpen((open) => !open)} onMouseEnter={() => setMenuOpen(true)} title="Conversation actions" type="button"><MoreHorizontal size={16} /></button>
+            <button aria-expanded={menuOpen} aria-haspopup="menu" aria-label={`Actions for ${chat.title || 'conversation'}`} className="mr-1 shrink-0 p-2 text-[#777a72] hover:text-[#f4f0e8]" onClick={() => setMenuOpen((open) => !open)} title="Conversation actions" type="button"><MoreHorizontal size={16} /></button>
           </>}
         </div>
       )}
-      {menuOpen && <div className="absolute right-1 top-10 z-10 w-44 border border-white/10 bg-[#22251f] py-1 shadow-xl">
+      {menuOpen && <div className="absolute right-1 top-9 z-10 w-36 border border-white/10 bg-[#22251f] py-0.5 text-[11px] shadow-xl" role="menu">
         {!archived && <button className="menu-action" disabled={busy} onClick={() => runAction(() => togglePin(chat._id).unwrap())}><Pin size={14} />{chat.isPinned ? 'Unpin' : 'Pin'}</button>}
         <button className="menu-action" disabled={busy} onClick={() => { setRenaming(true); setMenuOpen(false) }}><Pencil size={14} />Rename</button>
         <button className="menu-action" disabled={busy} onClick={() => runAction(() => toggleArchive(chat._id).unwrap())}>{archived ? <RotateCcw size={14} /> : <Archive size={14} />}{archived ? 'Restore' : 'Archive'}</button>
