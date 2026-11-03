@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Check, Copy, FileText, Pencil, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
+import { ArrowDown, Check, Copy, FileText, Pencil, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import MessageEditForm from './MessageEditForm.jsx'
@@ -129,6 +129,7 @@ const AttachmentList = ({ attachments = [] }) => attachments.length > 0 && (
 const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPrompt = '', streamingAttachments = [], streamingText = '', actionError = '', onEditMessage, onRegenerate, onRetry, onDelete }) => {
   const scrollRegionRef = useRef(null)
   const shouldFollowStreamRef = useRef(true)
+  const [showGoToBottom, setShowGoToBottom] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState(null)
   const [copiedMessageId, setCopiedMessageId] = useState(null)
   const copyTimeoutRef = useRef(null)
@@ -137,13 +138,24 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
 
   useLayoutEffect(() => {
     const scrollRegion = scrollRegionRef.current
-    if (scrollRegion && shouldFollowStreamRef.current) scrollRegion.scrollTop = scrollRegion.scrollHeight
+    if (!scrollRegion) return
+    if (shouldFollowStreamRef.current) scrollRegion.scrollTop = scrollRegion.scrollHeight
+    updateScrollPosition()
   }, [displayedStreamingText, isStreaming, messages])
 
-  const trackScrollPosition = () => {
+  const updateScrollPosition = () => {
     const scrollRegion = scrollRegionRef.current
     if (!scrollRegion) return
-    shouldFollowStreamRef.current = scrollRegion.scrollHeight - scrollRegion.scrollTop - scrollRegion.clientHeight < 96
+    const distanceFromBottom = scrollRegion.scrollHeight - scrollRegion.scrollTop - scrollRegion.clientHeight
+    shouldFollowStreamRef.current = distanceFromBottom < 96
+    setShowGoToBottom(scrollRegion.scrollHeight > scrollRegion.clientHeight + 96 && distanceFromBottom >= 96)
+  }
+
+  const goToBottom = () => {
+    const scrollRegion = scrollRegionRef.current
+    if (!scrollRegion) return
+    shouldFollowStreamRef.current = true
+    scrollRegion.scrollTo({ top: scrollRegion.scrollHeight, behavior: 'smooth' })
   }
 
   useEffect(() => () => window.clearTimeout(copyTimeoutRef.current), [])
@@ -173,47 +185,60 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
   if (isLoading) return <div className="grid flex-1 place-items-center text-sm text-[#92958c]">Loading conversation...</div>
 
   return (
-    <div className="message-scroll-region scrollbar-hidden min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 sm:px-8" onScroll={trackScrollPosition} ref={scrollRegionRef}>
-      <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-9">
-        {actionError && <p aria-live="polite" className="border-l-2 border-[#f07865] bg-[#f07865]/10 px-3 py-2 text-sm leading-6 text-[#f5a89b]">{actionError}</p>}
-        {messages.length === 0 && <div className="py-16 text-center"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#d8f36a]">Let's go buddy</p><p className="mt-3 text-2xl font-semibold text-[#f4f0e8]">Start wherever your mind is.</p></div>}
-        {messages.map((message, index) => {
-          const isUser = message.role === 'USER'
-          const isLatest = index === messages.length - 1
-          const canRegenerate = isLatest && message.role === 'ASSISTANT' && message.status === 'COMPLETED'
-          const canRetry = isLatest && message.role === 'ASSISTANT' && ['FAILED', 'CANCELLED'].includes(message.status)
-          const isEditing = editingMessageId === message._id
+    <div className="relative min-h-0 flex-1">
+      <div className="message-scroll-region scrollbar-hidden h-full overflow-x-hidden overflow-y-auto overscroll-contain px-5 py-8 sm:px-8" onScroll={updateScrollPosition} ref={scrollRegionRef}>
+        <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-9">
+          {actionError && <p aria-live="polite" className="border-l-2 border-[#f07865] bg-[#f07865]/10 px-3 py-2 text-sm leading-6 text-[#f5a89b]">{actionError}</p>}
+          {messages.length === 0 && <div className="py-16 text-center"><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#d8f36a]">Let's go buddy</p><p className="mt-3 text-2xl font-semibold text-[#f4f0e8]">Start wherever your mind is.</p></div>}
+          {messages.map((message, index) => {
+            const isUser = message.role === 'USER'
+            const isLatest = index === messages.length - 1
+            const canRegenerate = isLatest && message.role === 'ASSISTANT' && message.status === 'COMPLETED'
+            const canRetry = isLatest && message.role === 'ASSISTANT' && ['FAILED', 'CANCELLED'].includes(message.status)
+            const isEditing = editingMessageId === message._id
 
-          return <article className={`group flex w-full min-w-0 flex-col ${isUser ? 'items-end' : 'items-start'}`} key={message._id}>
-            <div className={`min-w-0 ${isUser ? `${isEditing ? 'w-full max-w-none' : 'max-w-[min(100%,680px)]'} border border-white/10 bg-[#1c1e1a] px-4 py-3` : 'w-full max-w-none bg-[#191b17]/35 px-4 py-4 sm:px-5'}`}>
-              {!isUser && <div className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[#9fa39a]">Aira{message.status && message.status !== 'COMPLETED' && <span className="ml-2 text-[#f07865]">{message.status.toLowerCase()}</span>}</div>}
-              {isEditing ? <MessageEditForm disabled={isStreaming} message={message} onCancel={() => setEditingMessageId(null)} onSave={onEditMessage} /> : <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">
-                {message.content?.trim() && <Markdown content={message.content} />}
+            return <article className={`group flex w-full min-w-0 flex-col ${isUser ? 'items-end' : 'items-start'}`} key={message._id}>
+              <div className={`min-w-0 ${isUser ? `${isEditing ? 'w-full max-w-none' : 'max-w-[min(100%,680px)]'} border border-white/10 bg-[#1c1e1a] px-4 py-3` : 'w-full max-w-none bg-[#191b17]/35 px-4 py-4 sm:px-5'}`}>
+                {!isUser && <div className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[#9fa39a]">Aira{message.status && message.status !== 'COMPLETED' && <span className="ml-2 text-[#f07865]">{message.status.toLowerCase()}</span>}</div>}
+                {isEditing ? <MessageEditForm disabled={isStreaming} message={message} onCancel={() => setEditingMessageId(null)} onSave={onEditMessage} /> : <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">
+                  {message.content?.trim() && <Markdown content={message.content} />}
+                </div>}
+                <AttachmentList attachments={message.attachments} />
+                {message.metadata?.error?.message && <p className="mt-3 border-l-2 border-[#f07865] pl-3 text-xs leading-5 text-[#f5a89b]">{message.metadata.error.message}</p>}
+              </div>
+              {!isEditing && <div className={`mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${isUser ? 'justify-end' : 'justify-start'}`}>
+                <button aria-label={copiedMessageId === message._id ? 'Message copied' : `Copy ${isUser ? 'message' : 'response'}`} className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={!message.content} onClick={() => copyMessage(message._id, message.content)} title={copiedMessageId === message._id ? 'Copied' : 'Copy'} type="button">{copiedMessageId === message._id ? <Check size={15} /> : <Copy size={15} />}</button>
+                {isUser && <button aria-label="Edit and resend message" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => setEditingMessageId(message._id)} title="Edit and resend" type="button"><Pencil size={15} /></button>}
+                {canRegenerate && <button aria-label="Regenerate response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRegenerate(message._id)} title="Regenerate response" type="button"><RotateCw size={15} /></button>}
+                {canRetry && <button aria-label="Retry response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRetry(message._id)} title="Retry response" type="button"><RotateCcw size={15} /></button>}
+                <button aria-label={`Delete ${isUser ? 'message' : 'response'}`} className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-[#f07865]/10 hover:text-[#f07865] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onDelete(message._id)} title="Delete message" type="button"><Trash2 size={15} /></button>
               </div>}
-              <AttachmentList attachments={message.attachments} />
-              {message.metadata?.error?.message && <p className="mt-3 border-l-2 border-[#f07865] pl-3 text-xs leading-5 text-[#f5a89b]">{message.metadata.error.message}</p>}
+            </article>
+          })}
+          {isStreaming && streamingPrompt && <article className="flex w-full min-w-0 justify-end">
+            <div className="min-w-0 max-w-[min(100%,680px)] border border-white/10 bg-[#1c1e1a] px-4 py-3">
+              <div className="whitespace-pre-wrap text-sm leading-7 text-[#e8e5dc]">{streamingPrompt}</div>
+              <AttachmentList attachments={streamingAttachments} />
             </div>
-            {!isEditing && <div className={`mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${isUser ? 'justify-end' : 'justify-start'}`}>
-              <button aria-label={copiedMessageId === message._id ? 'Message copied' : `Copy ${isUser ? 'message' : 'response'}`} className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={!message.content} onClick={() => copyMessage(message._id, message.content)} title={copiedMessageId === message._id ? 'Copied' : 'Copy'} type="button">{copiedMessageId === message._id ? <Check size={15} /> : <Copy size={15} />}</button>
-              {isUser && <button aria-label="Edit and resend message" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => setEditingMessageId(message._id)} title="Edit and resend" type="button"><Pencil size={15} /></button>}
-              {canRegenerate && <button aria-label="Regenerate response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRegenerate(message._id)} title="Regenerate response" type="button"><RotateCw size={15} /></button>}
-              {canRetry && <button aria-label="Retry response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRetry(message._id)} title="Retry response" type="button"><RotateCcw size={15} /></button>}
-              <button aria-label={`Delete ${isUser ? 'message' : 'response'}`} className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-[#f07865]/10 hover:text-[#f07865] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onDelete(message._id)} title="Delete message" type="button"><Trash2 size={15} /></button>
-            </div>}
-          </article>
-        })}
-        {isStreaming && streamingPrompt && <article className="flex w-full min-w-0 justify-end">
-          <div className="min-w-0 max-w-[min(100%,680px)] border border-white/10 bg-[#1c1e1a] px-4 py-3">
-            <div className="whitespace-pre-wrap text-sm leading-7 text-[#e8e5dc]">{streamingPrompt}</div>
-            <AttachmentList attachments={streamingAttachments} />
-          </div>
-        </article>}
-        {isStreaming && <article className="flex w-full min-w-0 justify-start">
-          <div className="w-full min-w-0 bg-[#191b17]/35 px-4 py-4 sm:px-5">
-            <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">{displayedStreamingText ? <Markdown content={displayedStreamingText} /> : <span aria-label="Aira is thinking" className="inline-flex items-center gap-1 text-[#92958c]"><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" /><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" /><span className="size-1.5 animate-bounce rounded-full bg-current" /></span>}</div>
-          </div>
-        </article>}
+          </article>}
+          {isStreaming && <article className="flex w-full min-w-0 justify-start">
+            <div className="w-full min-w-0 bg-[#191b17]/35 px-4 py-4 sm:px-5">
+              <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">{displayedStreamingText ? <Markdown content={displayedStreamingText} /> : <span aria-label="Aira is thinking" className="inline-flex items-center gap-1 text-[#92958c]"><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" /><span className="size-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" /><span className="size-1.5 animate-bounce rounded-full bg-current" /></span>}</div>
+            </div>
+          </article>}
+        </div>
       </div>
+      {showGoToBottom && (
+        <button
+          aria-label="Go to bottom"
+          className="absolute bottom-5 left-1/2 z-10 grid size-10 -translate-x-1/2 place-items-center rounded-full border border-[#d8f36a] bg-[#d8f36a] text-[#171912] shadow-lg transition hover:bg-[#e5ff85]"
+          onClick={goToBottom}
+          title="Go to bottom"
+          type="button"
+        >
+          <ArrowDown aria-hidden="true" size={16} />
+        </button>
+      )}
     </div>
   )
 }
