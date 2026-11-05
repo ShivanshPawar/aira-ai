@@ -1,49 +1,78 @@
-# Aira AI - Product & Technical Documentation
+# Aira AI
 
-## 1. Document Information
+Aira is a personal AI workspace for thinking things through, exploring ideas, and getting work done. Start a conversation with Groq or Gemini, keep related chats organized, and return to the history whenever you need it.
 
-| Item | Value |
-| --- | --- |
-| Project | Aira AI |
-| Status | Backend implementation is complete and hardened according to the project status documentation; this document is the verified backend reference. |
-| Purpose | Product, architecture, API, and frontend-integration reference for the current backend. |
-| Scope | `server/` application source, configuration templates, package scripts, and existing backend documentation. |
-| Last updated | 2026-09-10 |
-| Backend status | Implemented: Express API, MongoDB persistence, authentication, chat, AI generation, SSE, uploads, and provider abstraction. |
-| Frontend status | Not implemented or verified in this backend documentation pass. Frontend development is the next documented phase. |
-| Technology stage | Backend contract established; frontend integration can begin against the API documented here. |
+## What Aira Does
 
-This is a documentation-only artifact. It describes the repository as inspected and does not represent a roadmap as implementation.
+- Keeps conversations in a searchable workspace with pin, archive, rename, and delete controls.
+- Streams assistant replies as they arrive, with controls to stop, retry, or regenerate eligible responses.
+- Lets you edit or delete your messages; editing replaces the conversation that followed that message.
+- Supports image, PDF, text, Markdown, JSON, XML, and YAML attachments in Gemini chats. Groq chats are text-only.
+- Restores signed-in sessions through a protected refresh cookie.
+- Provides a dedicated Account page for your display name, avatar, password, and sign-out controls.
+- Keeps Preferences focused on AI provider and model selection.
 
-## 2. Product Overview
+## Run Locally
 
-Aira AI is a persistent AI chat backend. It lets authenticated users create and manage chats, send messages to selected AI providers, receive complete JSON responses or streamed SSE responses, attach supported files to Gemini conversations, and retain message, token, and summary metadata in MongoDB.
+You need Node.js 20.19+ (or 22.12+), npm, MongoDB, at least one provider key (Gemini or Groq), and ImageKit credentials. The API validates ImageKit configuration at startup.
 
-The shared system prompt presents Aira as an "AI Buddy for Humans" intended to help with understanding, creating, solving, deciding, learning, and completing work. No narrower target audience is formally documented or verified.
+In one PowerShell terminal, configure and start the API:
 
-Current capabilities are limited to the implemented backend contract: text chat, Gemini and Groq generation, chat management, authentication, file upload, and conversation memory through summaries. The repository does not implement RAG, embeddings, vector search, web search, agents, tool calling, voice, image generation, payments, subscriptions, collaboration, an admin dashboard, or a mobile client.
+```powershell
+Set-Location server
+Copy-Item .env.example .env
+# Fill in MongoDB, JWT, provider, and ImageKit values in .env.
+npm install
+npm run dev
+```
 
-## 3. Product Vision & Goals
+Set `PORT=5000` and `CLIENT_URL=http://localhost:5173` in `server/.env`. In a second terminal, configure and start the client:
 
-### Current implemented goals
+```powershell
+Set-Location client
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
 
-- Provide a protected, persistent AI-chat API with a clear frontend contract.
-- Support provider-specific generation through one normalized application interface.
-- Preserve conversation continuity with chronological history, bounded context windows, and asynchronous summaries.
-- Provide resilient generation states: completed, failed, and cancelled responses remain visible and can be handled safely.
-- Accept user-owned files for Gemini conversations without silently passing attachments to unsupported providers.
+Open `http://localhost:5173`. The client API origin is configured by `VITE_API_BASE_URL`; keep it pointed at the API's `/api/v1` base path. The browser origin must exactly match the backend's `CLIENT_URL` for credentialed session requests.
 
-### Future/product direction
+## Current Status
 
-The documented next phase is frontend development. No frontend design, client framework, or additional product capability is verified in the backend repository.
+The web client and API provide the documented authentication, account, chat, message, and file workflows. Provider/model defaults for new chats are held in browser memory and reset after a full reload; active chat settings are stored with each chat.
 
-## 4. Core Features
+Client ESLint, the client production build, and server ESLint pass. Automated test scripts and a maintained automated test suite are not configured. End-to-end acceptance against a fully configured backend and external providers remains a manual deployment check. Markdown rendering and code highlighting are split into separate client build chunks.
+
+### Current client experience
+
+- On mobile, the navigation menu is on the left side of the header; the header does not display the logo. The profile control remains on the right.
+- The collapsed desktop sidebar shows the brand mark, New conversation, and Search at the top, with Archive and Preferences at the bottom. Hovering expands the sidebar to show the recent chat list.
+- Preferences contains AI provider/model selection. Profile details, avatar upload, password changes, and sign-out are on the Account page (`/profile`).
+- Avatar upload is launched from the small camera control on the avatar. Profile and password forms are constrained in width; account submit actions use the primary lime style, while Sign out retains its red styling.
+- In a long conversation, an arrow-only Go to bottom control appears when the reader scrolls away from the latest messages. Returning to the bottom resumes following a streamed response.
+
+## Product Boundaries
+
+- Gemini and Groq are the available providers; supported model choices are restricted to the API contract.
+- A message supports up to 10 unique attachments, uploaded one file per request, with a 10 MiB per-file limit. Attachments are available only in Gemini chats.
+- Message mutations are serialized per chat within one server process. Multi-instance coordination is not yet provided.
+- There is no public file-library or file-deletion endpoint, shared workspace, voice interface, billing, or mobile app.
+
+## Documentation
+
+This README is the versioned project and engineering reference. The nested `client/.gitignore` and `server/.gitignore` exclude their `docs/` directories, so local notes under those directories are not included in a repository checkout and are intentionally not linked here.
+
+## Engineering Reference
+
+The sections below retain the detailed API, architecture, persistence, security, and integration reference for contributors.
+
+## Core Features
 
 | Feature | Status | Verified behavior |
 | --- | --- | --- |
 | Health check | Implemented | Public liveness response at `/api/v1/health`. |
 | Authentication | Implemented | Registration, login, bearer access tokens, refresh-cookie sessions, refresh, and logout. |
-| User profile | Implemented | Protected current-user endpoint. |
+| Account | Implemented | Read/update name and avatar, change password, and sign out from the Account page. |
 | Chat management | Implemented | Create, list, search, filter, paginate, retrieve, update, rename, pin, archive, and delete owned chats. |
 | AI generation | Implemented | Non-stream generation through Gemini or Groq adapters. |
 | Streaming | Implemented | SSE token chunks, completion event, and safe error event. |
@@ -56,8 +85,19 @@ The documented next phase is frontend development. No frontend design, client fr
 | Context management | Implemented | Completed history is bounded by provider-specific estimated token budgets. |
 | Conversation summaries | Implemented | Background summaries are generated after token thresholds and guarded against stale history. |
 | In-process mutation protection | Implemented | Per-chat lock rejects overlapping message mutations in one server process. |
+| Responsive navigation | Implemented | Mobile menu control, compact desktop sidebar, chat search, Archive, and Preferences access. |
+| Long conversation navigation | Implemented | Arrow-only Go to bottom control appears when scrolled away from the latest messages. |
 
 ## 5. Technology Stack
+
+### Frontend
+
+- JavaScript ES modules, React 19, and Vite 7.
+- React Router for public, protected, chat, archive, preferences, and account routes.
+- Redux Toolkit and RTK Query for client state and API data.
+- Tailwind CSS 4 for styling; Lucide React for icons.
+- Native `fetch` streaming for authenticated server-sent events.
+- React Markdown and `remark-gfm` for Markdown and GitHub-flavored Markdown rendering.
 
 ### Backend
 
@@ -97,33 +137,55 @@ The documented next phase is frontend development. No frontend design, client fr
 
 ### Development Tools
 
-- ESLint 10.
+- ESLint 9 in the client and ESLint 10 in the server.
 - Prettier.
 - Nodemon.
 
 ### Testing
 
-No test runner script and no automated test files were found under `server/`. The existing status report records prior live and controlled-provider verification; see [Testing & Verification](#38-testing--verification).
+Neither package defines an automated test script. ESLint is available for both projects; the client also has a Vite production build.
 
 ## 6. System Architecture
 
 ```mermaid
-flowchart TD
-	Client[Frontend client] -->|HTTP JSON / SSE| Express[Express API]
-	Express --> Middleware[Helmet, CORS, JSON, cookies, rate limit, auth, validation]
-	Middleware --> Routes[Feature routes]
-	Routes --> Controllers[Controllers]
-	Controllers --> Services[Services]
-	Services --> Repositories[Repositories]
-	Repositories --> Mongo[(MongoDB)]
-	Services --> AIService[AI service]
-	AIService --> Factory[Provider factory]
-	Factory --> Gemini[Gemini provider]
-	Factory --> Groq[Groq provider]
-	Services --> Storage[ImageKit storage service]
+flowchart LR
+	User[User] --> Browser
+
+	subgraph Client["Browser client · React + Vite"]
+		Browser[React application]
+		Router[React Router<br/>Public and protected routes]
+		Pages[Auth · Chat · Archive<br/>Preferences · Account]
+		State[Redux Toolkit<br/>RTK Query]
+		Stream[Fetch-based SSE client]
+		Browser --> Router --> Pages
+		Pages <--> State
+		Pages --> Stream
+	end
+
+	subgraph API["API · Express + Node.js"]
+		Express[Versioned REST API<br/>/api/v1]
+		Middleware[Security · CORS · parsing<br/>rate limit · auth · validation]
+		Routes[Feature routes]
+		Controllers[Controllers]
+		Services[Services]
+		Repositories[Repositories]
+		AI[AI providers<br/>Gemini · Groq]
+		Storage[File storage<br/>ImageKit]
+		Express --> Middleware --> Routes --> Controllers --> Services
+		Services --> Repositories
+		Services --> AI
+		Services --> Storage
+	end
+
+	Pages -->|Credentialed JSON requests| Express
+	Stream -->|Authenticated SSE| Express
+	Repositories <--> Mongo[(MongoDB)]
+	AI <--> Gemini[Google Gemini API]
+	AI <--> Groq[Groq API]
+	Storage <--> ImageKit[ImageKit]
 ```
 
-The server mounts all versioned routes below `/api/v1`. Controllers translate HTTP concerns into service calls. Services own authorization, lifecycle, and business rules. Repositories isolate Mongoose operations. AI and storage providers are selected behind small application contracts.
+The server mounts versioned routes below `/api/v1`. Controllers translate HTTP concerns into service calls. Services own authorization, lifecycle, and business rules. Repositories isolate Mongoose operations. AI and storage providers are selected behind application contracts. The client uses RTK Query for ordinary API data and a fetch-based SSE client for response streaming.
 
 ## 7. Backend Architecture
 
@@ -143,13 +205,27 @@ Errors from async handlers reach the global error middleware. Expected `ApiError
 ## 8. Project Directory Structure
 
 ```text
+client/
+├── public/                     # Static assets
+├── src/
+│   ├── app/                    # React Router setup
+│   ├── features/
+│   │   ├── auth/               # Sign-in, registration, account, session
+│   │   ├── chats/              # Workspace, archive, preferences, chat UI
+│   │   ├── files/              # Upload API and file validation
+│   │   ├── health/             # Health API
+│   │   └── messages/           # Message UI, API, and streaming hooks
+│   ├── layouts/                # Authentication and chat shells
+│   ├── routes/                 # Public-only and protected route guards
+│   ├── services/               # API and SSE clients
+│   ├── store/                  # Redux store
+│   ├── pages/                  # Shared pages such as not found
+│   └── index.css               # Global styles
+├── .env.example
+├── package.json
+└── vite.config.js
+
 server/
-├── docs/
-│   ├── AIRA_AI_PROJECT_DOCUMENTATION.md
-│   ├── API_ENDPOINTS.md
-│   ├── AUTH_FLOW.md
-│   ├── BACKEND_STATUS_REPORT.md
-│   └── GROQ_INVALID_ROLE_ROOT_CAUSE*.md
 ├── src/
 │   ├── config/                 # Environment, MongoDB, ImageKit
 │   ├── middlewares/            # Auth, validation, uploads, errors, rate limit
@@ -218,11 +294,13 @@ The CORS policy permits only `CLIENT_URL`, enables credentials, and allows `GET`
 
 ## 10. User Management
 
-Current user functionality is intentionally narrow:
+The Account page is separate from AI Preferences and provides the user-facing account workflows:
 
-- Users are created through registration.
-- `GET /api/v1/users/me` returns the authenticated user's serialized record.
-- User passwords are hidden by the model's `toJSON` transform.
+- `GET /api/v1/users/me` returns the authenticated user's serialized record; passwords are excluded.
+- `PATCH /api/v1/users/me` updates the display name and/or avatar file reference.
+- Avatar changes upload an image through `POST /api/v1/files/upload`, then save the returned file ID as the account avatar. The camera control is overlaid on the avatar in the client.
+- `PATCH /api/v1/users/me/password` verifies the current password and changes it. Other signed-in devices are signed out after the change.
+- Sign out calls the auth logout endpoint, revokes the current refresh session, and clears client authentication state.
 - The schema contains `LOCAL` and `GOOGLE` auth-provider enum values, but no Google/OAuth route or flow is implemented or verified.
 
 ## 11. Chat System
@@ -237,8 +315,8 @@ Users can retrieve only their own chats. Listing separates active and archived c
 
 | Provider | Accepted models | Default when chosen without a model |
 | --- | --- | --- |
-| `GEMINI` | `gemini-2.5-flash` | `gemini-2.5-flash` |
-| `GROQ` | `openai/gpt-oss-120b`, `groq/compound`, `groq/compound-mini` | `groq/compound` |
+| `GEMINI` | `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3-flash-preview`, and `gemini-2.5-flash` | `gemini-3.6-flash` |
+| `GROQ` | `openai/gpt-oss-20b`, `openai/gpt-oss-120b` | `openai/gpt-oss-20b` |
 
 Create and update validators reject incompatible provider/model pairs. Updating only the provider selects that provider's default model. Updating only a model validates it against the chat's current provider. The schema has a `systemPrompt` field, but no current public chat request schema exposes it for create or update.
 
@@ -300,7 +378,7 @@ Non-stream provider responses use:
 {
 	"content": "...",
 	"provider": "GROQ",
-	"model": "groq/compound",
+	"model": "openai/gpt-oss-20b",
 	"finishReason": "...",
 	"usage": { "prompt": 0, "completion": 0, "total": 0 }
 }
@@ -310,19 +388,19 @@ Internal stream events use `token`, `done`, and `error` types. The HTTP SSE cont
 
 ## 14. Gemini Integration
 
-- Supported model: `gemini-2.5-flash`.
+- Default model: `gemini-3.6-flash`. The chat catalog also includes Gemini 3.5 Flash-Lite, 3.1 Flash-Lite, 3 Flash Preview, and 2.5 Flash.
 - Default options: temperature `0.7`, maximum output `8192`, top-p `0.95`, top-k `40`.
 - The provider uses `GoogleGenAI.models.generateContent` for complete responses and `generateContentStream` for streams.
 - A non-null system prompt is passed as Gemini `systemInstruction`.
 - The Gemini adapter changes application assistant messages to Gemini's `model` role. Other adapter messages are supplied as user input.
-- Gemini is the only provider that processes stored attachments. Images become inline base64 data; PDFs, text, and Markdown become text parts.
+- Every Gemini text-chat model in AIRA uses the same attachment pipeline. Images become inline base64 data; PDFs, text, and Markdown become text parts.
 - The provider passes the request abort signal as `abortSignal`.
 - Prompt, completion, and total token counts are read from Gemini usage metadata when supplied.
 
 ## 15. Groq Integration
 
-- Supported models: `openai/gpt-oss-120b`, `groq/compound`, and `groq/compound-mini`.
-- Default model/options: `groq/compound`, temperature `0.7`, maximum completion tokens `2048`, top-p `1`.
+- Supported models: `openai/gpt-oss-20b` and `openai/gpt-oss-120b`.
+- Default model/options: `openai/gpt-oss-20b`, temperature `0.7`, maximum completion tokens `2048`, top-p `1`.
 - Groq uses chat completions for complete and streaming generation.
 - The adapter lower-cases and restricts roles to valid Groq `user`, `assistant`, and `system` values. A truthy configured system prompt is prepended as a system message.
 - The streaming request enables `stream_options.include_usage` so final usage can be captured when Groq supplies it.
@@ -606,7 +684,9 @@ Base path: `/api/v1`. All request bodies below are JSON unless explicitly marked
 | Method | Path | Auth | Request / parameters | Success response | Important errors and notes |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/health` | No | None | `200`, health object with `status`, `version`, `timestamp` | Global rate limit still applies. |
-| GET | `/users/me` | Bearer | None | `200`, serialized current user | `401` missing/invalid token; `404` if user record no longer exists. |
+| GET | `/users/me` | Access token | None | `200`, serialized current user | `401` missing/invalid token; `404` if user record no longer exists. |
+| PATCH | `/users/me` | Access token | `name` and/or `avatarFileId` | `200`, updated user | Name is 3-50 characters; at least one profile field is required. Avatar file is checked by the service. |
+| PATCH | `/users/me/password` | Access token | `currentPassword`, `newPassword` | `200`, success response | New password is 8-50 characters and must differ from current password. Other active sessions are revoked. |
 
 ### Authentication
 
@@ -683,6 +763,8 @@ Successful JSON endpoints use:
 | Object IDs | Chat, message, and attachment IDs must be 24 hexadecimal characters. |
 | Registration | Name 3-50; trimmed/lowercased valid email; password 8-50. |
 | Login | Trimmed/lowercased valid email; non-empty password. |
+| Profile update | Non-empty update; optional trimmed name 3-50 and/or avatar file ObjectId. |
+| Password update | Current password required; new password 8-50 and different from current. |
 | Chat providers/models | Enums plus compatible pair validation. |
 | Chat list | Page minimum 1; limit 1-100; search 1-120; boolean filter is string `true`/`false`. |
 | Chat titles | General update 1-120; rename 1-100. |
@@ -824,6 +906,13 @@ flowchart LR
 
 ## 35. Frontend Integration Contract
 
+### Navigation and account screens
+
+- `/login` and `/register` are public-only routes; `/chats`, `/chats/:chatId`, `/chats/archived`, `/settings`, and `/profile` require a signed-in session.
+- Preferences is intentionally limited to provider/model choices. For an active chat, changing either setting updates that chat; for a new conversation, defaults are held in client memory and reset on a full reload.
+- Profile/account controls (display name, avatar, password, sign out) live on `/profile`, not `/settings`. The avatar camera control opens the image file picker.
+- On mobile, the menu button is at the left of the header and the profile link is at the right. The desktop sidebar collapses to New conversation and Search controls, plus Archive and Preferences at the bottom; hover expands the recent chat list.
+
 ### Authentication
 
 1. Register or log in and save the JSON `accessToken` in the frontend's chosen access-token state.
@@ -840,6 +929,7 @@ Use the active and archived list endpoints separately. Preserve the returned pag
 
 - Treat a normal send as pending until its JSON response resolves.
 - For SSE, display token content as `chunk` frames arrive.
+- In a long conversation, the timeline shows an arrow-only Go to bottom control when the reader is more than 96 pixels from the latest content. Selecting it scrolls down and enables stream following again.
 - On `done`, fetch messages or reconcile the returned `messageId` with local state to obtain complete persisted metadata.
 - Show persisted `GENERATING`, `COMPLETED`, `FAILED`, and `CANCELLED` values from message reads.
 - Offer retry only for the latest `FAILED`/`CANCELLED` assistant message and regenerate only for the latest assistant message.
@@ -932,20 +1022,15 @@ node --check src/server.js
 
 ## 38. Testing & Verification
 
-### Verified in this documentation pass
+The package manifests define ESLint scripts for both client and server, plus a Vite production build for the client. Neither package currently defines an automated test script. Run the available checks from the repository root:
 
-- Inspected all current server source modules, route mounts, request validators, controllers, services, repositories, models, middleware, configuration, AI providers/adapters, storage providers, shared utilities, package scripts, `.env.example`, and all pre-existing Markdown documentation.
-- Cross-checked route paths, methods, request validation, API response envelope, SSE frames, provider/model allow-lists, token/context constants, and file limits against source.
-- Confirmed no automated test script and no server test files in the inspected tree.
+```powershell
+npm --prefix client run lint
+npm --prefix client run build
+npm --prefix server run lint
+```
 
-### Prior verification recorded by the repository
-
-`BACKEND_STATUS_REPORT.md` records prior lint, syntax, live API, provider, lifecycle, cancellation, retry, counter, token, and cleanup checks. This final documentation pass did not independently rerun those live checks; it treats the report as historical verification evidence and the source as the API contract.
-
-### Not automated / not verified here
-
-- A formal unit/integration test suite and CI pipeline are not currently documented or present in `server/package.json`.
-- Production deployment, horizontal multi-instance behavior, and external service account configuration were not independently verified in this documentation pass.
+Lint/build checks do not replace authenticated acceptance tests. Production CORS/cookie behavior, database connectivity, file storage, and external AI provider access depend on deployment configuration and should be tested in the target environment.
 
 ## 39. Production Readiness
 
@@ -963,7 +1048,7 @@ Operational readiness is bounded by the configured MongoDB, ImageKit, and AI-pro
 - The public file API only uploads files; list/get/delete file endpoints are not mounted.
 - ImageKit is the active upload provider. The local provider is a non-functional stub.
 - The server permits startup with one AI provider key, but its public provider/model selection can still target the unconfigured provider and yield a provider error.
-- No automated test runner/test suite was found in the server project.
+- Neither the client nor server currently defines an automated test runner/test suite.
 - `systemPrompt` is stored in the Chat schema but not configurable through the current public chat API.
 
 ## 41. Architectural Decisions
@@ -1012,14 +1097,12 @@ Operational readiness is bounded by the configured MongoDB, ImageKit, and AI-pro
 
 ## 42. Historical Troubleshooting Notes
 
-The existing historical notes remain available and are not duplicated here.
+The former Groq role mismatch is handled by the provider adapter: shared conversation roles are normalized to lower-case `user`, `assistant`, and `system` values.
 
 | Problem | Root cause | Current solution |
 | --- | --- | --- |
 | Groq invalid role rejection | Shared stored/conversation roles may be uppercase or provider-neutral. | `buildGroqMessages` maps roles to valid lower-case `user`, `assistant`, and `system` values. |
 | Groq context budget | A provider needs a bounded input window. | Message context uses the Groq 7000-token estimated budget; summaries also have bounded input/output budgets. |
-
-See `GROQ_INVALID_ROLE_ROOT_CAUSE.md` and `GROQ_INVALID_ROLE_ROOT_CAUSE012.md` for the concise historical records.
 
 ## 43. Current Project Status
 
@@ -1027,7 +1110,7 @@ See `GROQ_INVALID_ROLE_ROOT_CAUSE.md` and `GROQ_INVALID_ROLE_ROOT_CAUSE012.md` f
 | --- | --- |
 | Backend foundation | Implemented |
 | Authentication and authorization | Implemented |
-| User profile | Implemented |
+| Account management | Implemented: display name, avatar upload, password change, and sign out |
 | Chat system | Implemented |
 | Message system | Implemented |
 | Gemini and Groq abstraction | Implemented |
@@ -1035,10 +1118,14 @@ See `GROQ_INVALID_ROLE_ROOT_CAUSE.md` and `GROQ_INVALID_ROLE_ROOT_CAUSE012.md` f
 | Retry, regenerate, edit and resend | Implemented |
 | Attachments and ImageKit uploads | Implemented, Gemini-only for message use |
 | Security hardening | Implemented controls documented; production limitations remain |
-| Automated tests | Not present/verified in the inspected server project |
-| Documentation | Complete with this document |
-| Frontend | Next phase; not documented as implemented |
+| Message lifecycle actions | Implemented in client: edit/resend, latest-response regenerate/retry, and delete |
+| Frontend navigation | Implemented: compact desktop sidebar, mobile menu, archive, preferences, and account entry points |
+| Long chat navigation | Implemented: arrow-only Go to bottom control with stream-follow restoration |
+| Client verification | Client lint/build and server lint commands are available; authenticated end-to-end acceptance remains a deployment check |
+| Automated tests | No maintained automated test suite is currently configured |
+| Documentation | This README is the versioned project reference; nested `docs/` directories are git-ignored |
+| Frontend | Implemented: auth, account, chat management, preferences, message streaming, Gemini attachments, and message actions |
 
 ## 44. Next Development Phase
 
-The next logical phase is frontend development. The backend contract is now established around `/api/v1`, bearer access tokens, credentialed refresh cookies, JSON response envelopes, and authenticated SSE streams. Frontend work should use this document and the existing endpoint/auth references as the integration baseline without assuming unimplemented client features.
+Next quality improvements are automated unit/component/browser coverage and authenticated acceptance checks against a configured backend. Before production, verify CORS and secure-cookie settings over HTTPS and account for the operational limitations above. The API contract remains under `/api/v1`, with bearer access tokens, credentialed refresh cookies, JSON response envelopes, and authenticated SSE streams.

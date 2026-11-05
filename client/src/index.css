@@ -124,23 +124,24 @@ select option:hover {
 
 .aira-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgb(216 243 106 / 55%) #111310;
+    scrollbar-color: rgb(216 243 106 / 40%) transparent;
 }
 
 .aira-scrollbar::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
 }
 
 .aira-scrollbar::-webkit-scrollbar-track {
-    background: #111310;
+    background: transparent;
 }
 
 .aira-scrollbar::-webkit-scrollbar-thumb {
-    background: rgb(216 243 106 / 55%);
+    border-radius: 9999px;
+    background: rgb(216 243 106 / 40%);
 }
 
 .aira-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #d8f36a;
+    background: rgb(216 243 106 / 75%);
 }
 
 .message-markdown> :first-child {

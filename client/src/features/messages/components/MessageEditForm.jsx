@@ -25,7 +25,7 @@ const MessageEditForm = ({ message, disabled = false, onCancel, onSave }) => {
       <textarea
         aria-label="Edit message"
         autoFocus
-        className="min-h-10 w-full resize-y border border-white/15 bg-[#111310] p-4 text-[15px] leading-7 text-[#f4f0e8] outline-none transition focus:border-[#d8f36a]"
+        className="aira-scrollbar min-h-10 w-full resize-y border border-white/15 bg-[#111310] p-4 text-[15px] leading-7 text-[#f4f0e8] outline-none transition focus:border-[#d8f36a]"
         maxLength={10000}
         onChange={(event) => setContent(event.target.value)}
         value={content}

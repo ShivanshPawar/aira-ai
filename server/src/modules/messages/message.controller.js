@@ -159,10 +159,19 @@ export const streamMessage = async (req, res) => {
 			req.validatedData.body.attachments,
 			controller.signal,
 		);
-	} catch {
+	} catch (error) {
 		if (controller.signal.aborted || res.writableEnded) {
 			return;
 		}
+
+		res.write(
+			`data: ${JSON.stringify({
+				type: "error",
+				message: getStreamErrorMessage(error),
+				code: error?.code ?? "UNKNOWN_ERROR",
+			})}\n\n`,
+		);
+
 		res.end();
 	}
 };

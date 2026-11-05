@@ -16,7 +16,7 @@ export class QueryBuilder {
 	search(field = "title") {
 		if (this.query.search) {
 			this.filters[field] = {
-				$regex: this.query.search,
+				$regex: this.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
 				$options: "i",
 			};
 		}
