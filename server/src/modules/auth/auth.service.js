@@ -104,19 +104,32 @@ const validateRefreshSession = async (refreshToken) => {
 	return {
 		user,
 		session,
+		refreshTokenHash: hashedToken,
 	};
 };
 
 const refresh = async (refreshToken) => {
-	const { user } = await validateRefreshSession(refreshToken);
+	const { user, session, refreshTokenHash } =
+		await validateRefreshSession(refreshToken);
 
-	const accessToken = generateAccessToken({
-		sub: user._id.toString(),
-		role: user.role,
-	});
+	const { accessToken, refreshToken: nextRefreshToken } = generateTokens(user);
+	const nextTokenHash = hashToken(nextRefreshToken);
+	const expiresAt = new Date(Date.now() + env.REFRESH_TOKEN_MAX_AGE);
+
+	const rotatedSession = await authRepository.rotateSessionRefreshToken(
+		session._id,
+		refreshTokenHash,
+		nextTokenHash,
+		expiresAt,
+	);
+
+	if (!rotatedSession) {
+		throw new ApiError(HTTP_STATUS.UNAUTHORIZED, "Invalid session");
+	}
 
 	return {
 		accessToken,
+		refreshToken: nextRefreshToken,
 	};
 };
 

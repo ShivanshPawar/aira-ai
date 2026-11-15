@@ -33,6 +33,30 @@ export const authRepository = {
 		});
 	},
 
+	async rotateSessionRefreshToken(
+		sessionId,
+		currentTokenHash,
+		nextTokenHash,
+		expiresAt,
+	) {
+		// Compare-and-replace makes each refresh token usable only once, including across instances.
+		return Session.findOneAndUpdate(
+			{
+				_id: sessionId,
+				refreshToken: currentTokenHash,
+				isRevoked: false,
+				expiresAt: { $gt: new Date() },
+			},
+			{
+				$set: {
+					refreshToken: nextTokenHash,
+					expiresAt,
+				},
+			},
+			{ returnDocument: "after" },
+		);
+	},
+
 	async revokeSession(sessionId) {
 		return Session.findByIdAndUpdate(
 			sessionId,

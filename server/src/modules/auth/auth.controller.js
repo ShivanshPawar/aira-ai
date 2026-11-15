@@ -60,11 +60,13 @@ export const refresh = asyncHandler(async (req, res) => {
 
 	const data = await authService.refresh(refreshToken);
 
+	res.cookie(COOKIES.REFRESH_TOKEN, data.refreshToken, refreshCookieOptions);
+
 	return ApiResponse.success(
 		res,
 		HTTP_STATUS.OK,
 		"Access token refreshed successfully",
-		data,
+		{ accessToken: data.accessToken },
 	);
 });
 

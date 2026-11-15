@@ -16,26 +16,44 @@ import {
 	sendMessageSchema,
 } from "./message.validator.js";
 import { protect } from "../../middlewares/auth.middleware.js";
+import { aiGenerationRateLimiter } from "../../middlewares/rateLimiter.middleware.js";
 
 const router = Router();
 
 router.use(protect);
 
-router.post("/", validate(sendMessageSchema), sendMessage);
+router.post(
+	"/",
+	validate(sendMessageSchema),
+	aiGenerationRateLimiter,
+	sendMessage,
+);
 
 router.post(
 	"/:messageId/regenerate",
 	validate(messageIdSchema),
+	aiGenerationRateLimiter,
 	regenerateResponse,
 );
 
-router.put("/:messageId", validate(editMessageSchema), editMessage);
+router.put(
+	"/:messageId",
+	validate(editMessageSchema),
+	aiGenerationRateLimiter,
+	editMessage,
+);
 
-router.post("/stream", validate(sendMessageSchema), streamMessage);
+router.post(
+	"/stream",
+	validate(sendMessageSchema),
+	aiGenerationRateLimiter,
+	streamMessage,
+);
 
 router.post(
 	"/:messageId/retry/stream",
 	validate(messageIdSchema),
+	aiGenerationRateLimiter,
 	retryStreamMessage,
 );
 
