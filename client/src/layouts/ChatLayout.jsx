@@ -112,7 +112,7 @@ const ChatLayout = () => {
         <header className="flex h-18 min-h-18 shrink-0 items-center justify-between border-b border-white/10 px-5 sm:px-8">
           <button aria-label="Open navigation" className="text-[#92958c] hover:text-[#f4f0e8] lg:hidden" onClick={() => setSidebarOpen(true)} type="button"><Menu size={20} /></button>
           <div className="ml-auto flex items-center gap-3">
-            <Link aria-label="Open profile" className="grid size-8 overflow-hidden rounded-full border border-white/15 bg-[#191b17] text-xs font-semibold text-[#d8f36a] hover:border-[#d8f36a]" to={ROUTES.profile}>{user?.avatar?.url ? <img alt="" aria-hidden="true" className="size-full object-cover" src={user.avatar.url} /> : user?.name?.slice(0, 1).toUpperCase()}</Link>
+            <Link aria-label="Open profile" className="grid size-8 place-items-center overflow-hidden rounded-full border border-white/15 bg-[#191b17] text-center text-xs font-semibold leading-none text-[#d8f36a] hover:border-[#d8f36a]" to={ROUTES.profile}>{user?.avatar?.url ? <img alt="" aria-hidden="true" className="size-full object-cover object-center" src={user.avatar.url} /> : user?.name?.slice(0, 1).toUpperCase()}</Link>
           </div>
         </header>
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden"><Outlet /></main>

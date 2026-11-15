@@ -109,6 +109,15 @@ select option:hover {
     color: #f4f0e8;
 }
 
+.menu-action--delete,
+.menu-action--delete:hover {
+    color: #f07865;
+}
+
+.menu-action--delete:hover {
+    background: rgb(240 120 101 / 10%);
+}
+
 .menu-action:disabled {
     opacity: 0.5;
 }

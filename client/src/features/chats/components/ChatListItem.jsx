@@ -81,7 +81,7 @@ const ChatListItem = ({ chat, archived = false, compact = false, onNavigate = ()
         {!archived && <button className="menu-action" disabled={busy} onClick={() => runAction(() => togglePin(chat._id).unwrap())}><Pin size={14} />{chat.isPinned ? 'Unpin' : 'Pin'}</button>}
         <button className="menu-action" disabled={busy} onClick={() => { setRenaming(true); setMenuOpen(false) }}><Pencil size={14} />Rename</button>
         <button className="menu-action" disabled={busy} onClick={() => runAction(() => toggleArchive(chat._id).unwrap())}>{archived ? <RotateCcw size={14} /> : <Archive size={14} />}{archived ? 'Restore' : 'Archive'}</button>
-        <button className="menu-action text-[#f07865] hover:bg-[#f07865]/10" disabled={busy} onClick={removeChat}><Trash2 size={14} />Delete</button>
+        <button className="menu-action menu-action--delete" disabled={busy} onClick={removeChat}><Trash2 size={14} />Delete</button>
       </div>}
       {error && <p className="px-3 py-1 text-[10px] leading-4 text-[#f07865]">{error}</p>}
     </div>
