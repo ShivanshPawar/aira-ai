@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowDown, Check, Copy, FileText, Pencil, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
+import { ArrowDown, Check, ChevronsDown, ChevronsUp, Copy, FileText, Pencil, RotateCcw, RotateCw, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import MessageEditForm from './MessageEditForm.jsx'
@@ -58,6 +58,20 @@ const Markdown = ({ content }) => (
     {normalizeMarkdownTables(content)}
   </ReactMarkdown>
 )
+
+const UserInputContent = ({ content, className, markdown = true, expanded = false }) => {
+  const isLong = content.length > 500
+  const isCollapsed = isLong && !expanded
+
+  return <>
+    <div className={`relative ${isCollapsed ? 'max-h-40 overflow-hidden' : ''}`}>
+      {markdown
+        ? <div className={className}><Markdown content={content} /></div>
+        : <div className={className}>{content}</div>}
+      {isCollapsed && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-[#1c1e1a] to-transparent" />}
+    </div>
+  </>
+}
 
 const useStreamedText = (text) => {
   const [displayedText, setDisplayedText] = useState('')
@@ -132,6 +146,8 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
   const [showGoToBottom, setShowGoToBottom] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState(null)
   const [copiedMessageId, setCopiedMessageId] = useState(null)
+  const [expandedUserInputs, setExpandedUserInputs] = useState(() => new Set())
+  const [streamingPromptExpanded, setStreamingPromptExpanded] = useState(false)
   const copyTimeoutRef = useRef(null)
   const actionsUnavailable = Boolean(editingMessageId)
   const displayedStreamingText = useStreamedText(streamingText)
@@ -156,6 +172,15 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
     if (!scrollRegion) return
     shouldFollowStreamRef.current = true
     scrollRegion.scrollTo({ top: scrollRegion.scrollHeight, behavior: 'smooth' })
+  }
+
+  const toggleUserInput = (messageId) => {
+    setExpandedUserInputs((current) => {
+      const next = new Set(current)
+      if (next.has(messageId)) next.delete(messageId)
+      else next.add(messageId)
+      return next
+    })
   }
 
   useEffect(() => () => window.clearTimeout(copyTimeoutRef.current), [])
@@ -196,18 +221,21 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
             const canRegenerate = isLatest && message.role === 'ASSISTANT' && message.status === 'COMPLETED'
             const canRetry = isLatest && message.role === 'ASSISTANT' && ['FAILED', 'CANCELLED'].includes(message.status)
             const isEditing = editingMessageId === message._id
+            const isLongUserInput = isUser && (message.content?.length ?? 0) > 500
+            const isUserInputExpanded = expandedUserInputs.has(message._id)
 
             return <article className={`group flex w-full min-w-0 flex-col ${isUser ? 'items-end' : 'items-start'}`} key={message._id}>
               <div className={`min-w-0 ${isUser ? `${isEditing ? 'w-full max-w-none' : 'max-w-[min(100%,680px)]'} border border-white/10 bg-[#1c1e1a] px-4 py-3` : 'w-full max-w-none bg-[#191b17]/35 px-4 py-4 sm:px-5'}`}>
                 {!isUser && <div className="mb-3 font-mono text-[9px] uppercase tracking-[0.16em] text-[#9fa39a]">Aira{message.status && message.status !== 'COMPLETED' && <span className="ml-2 text-[#f07865]">{message.status.toLowerCase()}</span>}</div>}
-                {isEditing ? <MessageEditForm disabled={isStreaming} message={message} onCancel={() => setEditingMessageId(null)} onSave={onEditMessage} /> : <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">
-                  {message.content?.trim() && <Markdown content={message.content} />}
-                </div>}
+                {isEditing ? <MessageEditForm disabled={isStreaming} message={message} onCancel={() => setEditingMessageId(null)} onSave={onEditMessage} /> : isUser
+                  ? message.content?.trim() && <UserInputContent className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]" content={message.content} expanded={isUserInputExpanded} />
+                  : <div className="message-markdown min-w-0 max-w-full wrap-break-word text-[15px] leading-7 text-[#e8e5dc]">{message.content?.trim() && <Markdown content={message.content} />}</div>}
                 <AttachmentList attachments={message.attachments} />
                 {message.metadata?.error?.message && <p className="mt-3 border-l-2 border-[#f07865] pl-3 text-xs leading-5 text-[#f5a89b]">{message.metadata.error.message}</p>}
               </div>
               {!isEditing && <div className={`mt-1 flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${isUser ? 'justify-end' : 'justify-start'}`}>
                 <button aria-label={copiedMessageId === message._id ? 'Message copied' : `Copy ${isUser ? 'message' : 'response'}`} className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={!message.content} onClick={() => copyMessage(message._id, message.content)} title={copiedMessageId === message._id ? 'Copied' : 'Copy'} type="button">{copiedMessageId === message._id ? <Check size={15} /> : <Copy size={15} />}</button>
+                {isLongUserInput && <button aria-expanded={isUserInputExpanded} aria-label={isUserInputExpanded ? 'Show less' : 'Show more'} className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8]" onClick={() => toggleUserInput(message._id)} title={isUserInputExpanded ? 'Show less' : 'Show more'} type="button">{isUserInputExpanded ? <ChevronsUp size={15} /> : <ChevronsDown size={15} />}</button>}
                 {isUser && <button aria-label="Edit and resend message" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => setEditingMessageId(message._id)} title="Edit and resend" type="button"><Pencil size={15} /></button>}
                 {canRegenerate && <button aria-label="Regenerate response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRegenerate(message._id)} title="Regenerate response" type="button"><RotateCw size={15} /></button>}
                 {canRetry && <button aria-label="Retry response" className="grid size-8 cursor-pointer place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] disabled:opacity-40" disabled={actionsUnavailable} onClick={() => onRetry(message._id)} title="Retry response" type="button"><RotateCcw size={15} /></button>}
@@ -216,9 +244,14 @@ const MessageTimeline = ({ messages, isLoading, isStreaming = false, streamingPr
             </article>
           })}
           {isStreaming && streamingPrompt && <article className="flex w-full min-w-0 justify-end">
-            <div className="min-w-0 max-w-[min(100%,680px)] border border-white/10 bg-[#1c1e1a] px-4 py-3">
-              <div className="whitespace-pre-wrap text-sm leading-7 text-[#e8e5dc]">{streamingPrompt}</div>
-              <AttachmentList attachments={streamingAttachments} />
+            <div className="flex min-w-0 max-w-[min(100%,680px)] flex-col items-end">
+              <div className="min-w-0 border border-white/10 bg-[#1c1e1a] px-4 py-3">
+                <UserInputContent className="whitespace-pre-wrap text-sm leading-7 text-[#e8e5dc]" content={streamingPrompt} expanded={streamingPromptExpanded} markdown={false} />
+                <AttachmentList attachments={streamingAttachments} />
+              </div>
+              {streamingPrompt.length > 500 && <div className="mt-1 flex">
+                <button aria-expanded={streamingPromptExpanded} aria-label={streamingPromptExpanded ? 'Show less' : 'Show more'} className="grid size-8 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8]" onClick={() => setStreamingPromptExpanded((value) => !value)} title={streamingPromptExpanded ? 'Show less' : 'Show more'} type="button">{streamingPromptExpanded ? <ChevronsUp size={15} /> : <ChevronsDown size={15} />}</button>
+              </div>}
             </div>
           </article>}
           {isStreaming && <article className="flex w-full min-w-0 justify-start">
