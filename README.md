@@ -1,149 +1,160 @@
 # Aira AI
 
-A full-stack conversational AI web application supporting multiple LLM providers, real-time SSE response streaming, context-window summarization, and multimodal file attachments.
+Aira is a personal AI workspace for exploring ideas and getting work done. It combines a responsive chat interface with a versioned API, persistent conversation history, and model choices from Google Gemini and Groq.
 
+> **Project status:** The core web client and API workflows are implemented. Client lint/build and server lint/test commands are available. Deployment-dependent behavior (database, cookies/CORS, file storage, and AI providers) still needs acceptance testing with real configuration. The server has focused automated tests; a broad client or end-to-end suite is not configured.
+
+## At a glance
+
+- **Client:** React 19, Vite 7, React Router, Redux Toolkit/RTK Query, and Tailwind CSS 4.
+- **API:** Node.js (ES modules), Express 5, Zod, and Mongoose 9.
+- **Persistence:** MongoDB stores users, refresh sessions, chats, messages, and file metadata.
+- **AI:** Gemini and Groq behind a provider-neutral service and adapter layer.
+- **File storage:** ImageKit; Gemini chats can use supported attachments.
+- **API base path:** `/api/v1`.
 
 ## Features
 
-- **Multi-Provider AI Engine:** Switch seamlessly between **Groq** (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`) and **Google Gemini** (`gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3-flash-preview`, `gemini-2.5-flash`).
-- **Real-Time Streaming:** Server-Sent Events (SSE) for token-by-token streaming, message editing, response regeneration, and stream retries.
-- **Smart Context Management:** Automatic token tracking and background conversation summarization when chats exceed context thresholds.
-- **Multimodal Attachments:** Upload and analyze images, PDFs, Markdown, and plain text files via **ImageKit** or local storage.
-- **Chat Workspace:** Persistent chat history, auto-generated titles, archived chats, Markdown/GFM rendering, and syntax-highlighted code blocks.
-- **Authentication & Security:** JWT access/refresh token rotation with HTTP-only cookies, Helmet, CORS, Zod validation, and rate limiting.
+- Searchable conversations with pin, archive, rename, and delete controls.
+- Incremental assistant replies over authenticated server-sent events (SSE), including stop, retry, and regenerate actions where eligible.
+- Edit or delete user messages. Editing replaces the later conversation branch rather than appending a new version.
+- Gemini attachments for images, PDFs, text, Markdown, JSON, XML, and YAML. Groq chats are text-only.
+- Account page for display name, avatar, password changes, and sign-out; Preferences are for AI provider/model selection.
+- Refresh-cookie session restoration, ownership checks, request validation, and provider-aware conversation context.
 
-## Tech Stack
+## Architecture
 
-
-- **Frontend:** React 19, Vite, Redux Toolkit (RTK Query), React Router v7, Tailwind CSS v4, `react-markdown`, `lucide-react`
-- **Backend:** Node.js, Express 5, MongoDB (Mongoose), Zod, Multer, `pdf-parse`
-- **AI & Storage:** `@google/genai`, `groq-sdk`, ImageKit
-
-
-## Folder Structure
-
-The tree shows the main folders and entry/config files. Git ignore files, local `.env` files, dependencies, and generated build output are left out.
-
-```text
-aira-ai/
-├── client/
-│   ├── public/
-│   ├── src/
-│   │   ├── app/
-│   │   ├── constants/
-│   │   ├── features/
-│   │   │   ├── auth/
-│   │   │   │   └── pages/
-│   │   │   ├── chats/
-│   │   │   │   ├── components/
-│   │   │   │   └── pages/
-│   │   │   ├── files/
-│   │   │   ├── health/
-│   │   │   └── messages/
-│   │   │       ├── components/
-│   │   │       └── hooks/
-│   │   ├── layouts/
-│   │   ├── pages/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   │   ├── api/
-│   │   │   └── streaming/
-│   │   ├── store/
-│   │   ├── utils/
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
-│   ├── .env.example
-│   ├── package.json
-│   └── vite.config.js
-├── server/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── middlewares/
-│   │   ├── modules/
-│   │   │   ├── ai/
-│   │   │   │   ├── adapters/
-│   │   │   │   ├── config/
-│   │   │   │   ├── contracts/
-│   │   │   │   ├── errors/
-│   │   │   │   ├── providers/
-│   │   │   │   ├── services/
-│   │   │   │   └── utils/
-│   │   │   │       └── handlers/
-│   │   │   ├── auth/
-│   │   │   ├── chat/
-│   │   │   ├── files/
-│   │   │   ├── health/
-│   │   │   ├── messages/
-│   │   │   └── users/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   │   └── storage/
-│   │   │       └── providers/
-│   │   ├── shared/
-│   │   │   ├── constants/
-│   │   │   ├── errors/
-│   │   │   ├── responses/
-│   │   │   └── utils/
-│   │   ├── app.js
-│   │   └── server.js
-│   ├── .env.example
-│   └── package.json
-└── README.md
-```
-
-The client groups code by feature. The server keeps API features in `modules/`, with shared configuration, middleware, storage, and helpers alongside them. The two apps have separate dependencies and environment files.
-
-## System Architecture
+The diagram shows the main runtime boundaries and the direction of requests. The API separates HTTP handling from business rules and persistence; provider and storage integrations sit behind service abstractions.
 
 ```mermaid
 flowchart LR
-    user([User]) --> browser[Browser]
-    browser --> client[React client<br/>Vite and Redux Toolkit]
-    client -->|REST requests and file uploads| api[Express API<br/>/api/v1]
-    api -->|JSON responses and SSE chunks| client
-    api -->|Read and write app data| db[(MongoDB)]
-    api -->|Upload and retrieve attachments| storage[ImageKit]
-    api -->|Generation request| providers{Gemini or Groq}
-    providers -->|Generated response| api
+    User[User] --> Browser
+
+    subgraph Client[Browser client · React + Vite]
+        Browser[React application]
+        Router[React Router<br/>Public and protected routes]
+        UI[Auth · Workspace · Archive<br/>Preferences · Account]
+        State[Redux Toolkit<br/>RTK Query]
+        HTTP[Credentialed API client]
+        SSE[Fetch-based authenticated SSE client]
+        Upload[Multipart upload client]
+        Browser --> Router --> UI
+        UI <--> State
+        UI --> HTTP
+        UI --> SSE
+        UI --> Upload
+    end
+
+    subgraph Server[API · Express + Node.js · /api/v1]
+        App[App and middleware<br/>CORS · Helmet · rate limits · parsing]
+        Auth[Authentication and validation middleware]
+        Routes[Feature routes]
+        Controllers[Controllers<br/>JSON and SSE]
+        Services[Services<br/>ownership · lifecycle · business rules]
+        Repos[Repositories and Mongoose models]
+        AISvc[AI service<br/>context · provider selection · normalization]
+        FileSvc[File service<br/>validation · attachment preparation]
+        StorageSvc[Storage service]
+        App --> Auth --> Routes --> Controllers --> Services
+        Services --> Repos
+        Services --> AISvc
+        Services --> FileSvc
+        FileSvc --> StorageSvc
+    end
+
+    HTTP -->|JSON · bearer access token · cookies when needed| App
+    SSE -->|POST · bearer token · streamed SSE frames| App
+    Upload -->|Multipart · bearer access token| App
+    Repos <--> Mongo[(MongoDB)]
+    AISvc --> Gemini[Google Gemini API]
+    AISvc --> Groq[Groq API]
+    StorageSvc <--> ImageKit[ImageKit]
 ```
 
-The client sends API requests to the server. The server reads and writes app data in MongoDB, stores uploaded files in ImageKit, and passes chat prompts to the selected AI provider. Streaming replies are sent back to the client over SSE.
+### Request and data flow
 
-## clone the repo
+1. The client calls the API under `/api/v1`. Protected requests carry a short-lived bearer access token; refresh and logout use the HTTP-only refresh cookie.
+2. Middleware applies cross-cutting policies and validates/authenticates requests before feature routes call controllers.
+3. Controllers translate HTTP input into service operations. Services enforce ownership and message/chat lifecycle rules, then use repositories for MongoDB access.
+4. For generation, the message service builds bounded conversation context and calls the AI service. Provider adapters normalize Gemini/Groq responses and stream events.
+5. For uploads, the file service validates the incoming file, stores it with ImageKit, and records its metadata in MongoDB. Gemini prepares supported attachments for model input.
 
-```bash
-git clone https://github.com/ShivanshPawar/aira-ai.git
-cd aira-ai
+### Backend layers
+
+| Layer | Responsibility |
+| --- | --- |
+| Routes and middleware | Bind endpoints and apply authentication, validation, upload, rate-limit, and error policies. |
+| Controllers | Handle HTTP concerns, response envelopes, SSE headers/frames, and disconnect signals. |
+| Services | Enforce ownership, business rules, provider selection, and lifecycle transitions. |
+| Repositories and models | Encapsulate MongoDB queries and define persisted schemas/indexes. |
+| Integrations | Isolate Gemini, Groq, and ImageKit SDK behavior behind service/provider adapters. |
+
+## Technology and repository layout
+
+```text
+client/
+├── src/
+│   ├── app/                 # Router setup
+│   ├── features/            # Auth, chats, files, health, and messages
+│   ├── layouts/             # Application shells
+│   ├── routes/              # Public/protected route guards
+│   ├── services/            # API and SSE clients
+│   └── store/               # Redux store
+├── .env.example
+└── package.json
+
+server/
+├── src/
+│   ├── config/              # Environment, database, and ImageKit setup
+│   ├── middlewares/         # Auth, validation, uploads, errors, rate limits
+│   ├── modules/             # AI, auth, chat, files, health, messages, users
+│   ├── routes/              # API route aggregation
+│   ├── services/storage/    # Storage-provider abstraction
+│   ├── shared/              # Constants, errors, responses, utilities
+│   ├── app.js               # Express middleware and route mounting
+│   └── server.js            # Startup validation, DB connection, listener
+├── .env.example
+└── package.json
 ```
 
-From the repository root, open two terminals. In the first, set up and start the server:
+## Run locally
+
+### Prerequisites
+
+- Node.js **20.19+** or **22.12+** and npm.
+- A reachable MongoDB instance.
+- ImageKit credentials (validated when the API starts).
+- At least one AI provider key: Gemini or Groq.
+
+### Start the API
+
+In a terminal:
 
 ```bash
 cd server
-npm install
 cp .env.example .env
-```
-
-Add your MongoDB, JWT, ImageKit, and at least one AI provider key to `server/.env`, then run:
-
-```bash
+npm install
 npm run dev
 ```
 
-In the second terminal, set up and start the client:
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`. Set `PORT=5000` and `CLIENT_URL=http://localhost:5173` in `server/.env`, and fill in the required credentials below.
+
+### Start the client
+
+In a second terminal:
 
 ```bash
 cd client
-npm install
 cp .env.example .env
+npm install
 npm run dev
 ```
 
-The client uses `http://localhost:5000/api/v1` by default. Set `CLIENT_URL` in `server/.env` to the client URL shown by Vite (usually `http://localhost:5173`).
+Open <http://localhost:5173>. `VITE_API_BASE_URL` should point to the API's `/api/v1` base path. The browser origin must match `CLIENT_URL` exactly for credentialed CORS requests.
 
 ### Environment variables
-Use `server/.env.example` for API settings and `client/.env.example` for `VITE_API_BASE_URL`.
+
+Use the checked-in `.env.example` files as the source of truth for variable names. Never commit secrets.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
@@ -164,6 +175,18 @@ Use `server/.env.example` for API settings and `client/.env.example` for `VITE_A
 
 ImageKit configuration is required at API startup. At least one AI key is required, but selecting a provider whose key is not configured will fail when that provider is used.
 
+## Development and verification
+
+Run commands from the repository root:
+
+```bash
+npm --prefix client run lint
+npm --prefix client run build
+npm --prefix server run lint
+npm --prefix server test
+```
+
+The server test command uses Node's built-in test runner and currently covers refresh-token rotation. There is no client or end-to-end test suite. Lint/build checks do not replace authenticated acceptance tests against configured MongoDB, ImageKit, and AI providers.
 
 ## API overview
 
@@ -181,7 +204,6 @@ All endpoints are under `/api/v1`. Protected routes require `Authorization: Bear
 
 JSON responses use a `{ success, message, data }` success envelope. Validation and other JSON errors use `{ success: false, message, errors }`. Streaming message endpoints return SSE frames (`chunk`, `done`, or `error`) instead of the JSON envelope.
 
-
 ## Provider and attachment support
 
 | Provider | Supported models | Default model |
@@ -191,8 +213,25 @@ JSON responses use a `{ success, message, data }` success envelope. Validation a
 
 Models are validated against the provider. A message can reference up to 10 unique attachments; each upload is limited to 10 MiB and must be uploaded separately. Image/PDF/text-like attachments are supported in Gemini chats only; Groq attachment requests are rejected.
 
----
+## Security and operational notes
 
-## Author
+- Passwords are bcrypt-hashed. Access tokens are returned to the client; refresh tokens are HTTP-only cookies, and only SHA-256 refresh-token hashes are stored in MongoDB.
+- Refresh rotates the stored token hash and cookie and extends session expiry. Reusing an old token is rejected with `401`; concurrent use of the same token allows one request to succeed.
+- The client serializes refresh attempts within a tab, but separate tabs can race. Reuse rejection does not revoke the active token family.
+- CORS allows one configured origin and credentials. Production refresh cookies use `secure` and `sameSite=none`; deploy behind HTTPS.
+- The global IP limiter permits 1,000 requests per 15 minutes; AI generation has a separate limit of 60 requests per signed-in user per hour. Both use in-memory counters local to each server process.
+- Helmet, bounded JSON/file payloads, Zod validation, and service-level ownership checks are implemented.
+- Per-chat mutation protection uses an in-memory lock. It prevents overlapping operations within one server process, not across multiple instances.
 
-> **Shivansh Pawar** [🔗](https://www.linkedin.com/in/shivansh-pawar-853355322/)
+## Current limitations
+
+- No shared workspaces, voice interface, billing, or native mobile app.
+- No public file listing, retrieval, or deletion endpoint; deleting a chat does not remove its ImageKit files.
+- The local storage provider is a stub; ImageKit is the active provider.
+- No verified distributed mutation lock or automatic database TTL cleanup for expired sessions.
+- Conversation summaries run asynchronously and may be discarded if the source history changes.
+- No client or end-to-end acceptance suite is configured.
+
+## Contribution notes
+
+Keep business rules in services, HTTP behavior in controllers/middleware, and persistence queries in repositories. Provider-specific request/response behavior belongs in the AI adapters. Do not commit `.env` files or credentials. Before submitting a change, run the available lint/build/test checks and document any deployment-dependent verification that could not be performed.
