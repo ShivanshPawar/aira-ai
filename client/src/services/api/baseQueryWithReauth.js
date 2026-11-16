@@ -25,7 +25,7 @@ const refreshAccessToken = (api) => {
       .then((result) => {
         const token = result.data?.data?.accessToken
         if (token) api.dispatch(setAccessToken(token))
-        else api.dispatch(setSignedOut())
+        else if (result.error?.status === 401) api.dispatch(setSignedOut())
         return token ? result : null
       })
       .finally(() => {
@@ -51,7 +51,6 @@ export const baseQueryWithReauth = async (args, api, extraOptions) => {
     const refreshResult = await refreshAccessToken(api)
 
     if (refreshResult) result = await rawBaseQuery(args, api, extraOptions)
-    else api.dispatch(setSignedOut())
   }
 
   return unwrapEnvelope(result)

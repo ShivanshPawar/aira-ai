@@ -1,7 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { useDispatch } from 'react-redux'
 import { authApi } from './authApi.js'
-import { setSignedOut } from './authSlice.js'
+import { setRestoreFailed, setRestoring, setSignedOut } from './authSlice.js'
+
+export const restoreSession = async (dispatch) => {
+  dispatch(setRestoring())
+  try {
+    await dispatch(authApi.endpoints.refreshSession.initiate()).unwrap()
+    await dispatch(authApi.endpoints.getCurrentUser.initiate(undefined, { forceRefetch: true })).unwrap()
+  } catch (error) {
+    dispatch(error?.status === 401 ? setSignedOut() : setRestoreFailed())
+  }
+}
 
 export const useSessionRestore = () => {
   const dispatch = useDispatch()
@@ -11,15 +21,6 @@ export const useSessionRestore = () => {
     if (started.current) return
     started.current = true
 
-    const restore = async () => {
-      try {
-        await dispatch(authApi.endpoints.refreshSession.initiate()).unwrap()
-        await dispatch(authApi.endpoints.getCurrentUser.initiate(undefined, { forceRefetch: true })).unwrap()
-      } catch {
-        dispatch(setSignedOut())
-      }
-    }
-
-    restore()
+    restoreSession(dispatch)
   }, [dispatch])
 }

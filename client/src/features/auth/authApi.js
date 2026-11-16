@@ -31,8 +31,9 @@ export const authApi = apiSlice.injectEndpoints({
         try {
           const { data } = await queryFulfilled
           dispatch(setAccessToken(data.accessToken))
-        } catch {
-          dispatch(setSignedOut())
+        } catch (error) {
+          const status = error?.error?.status ?? error?.status
+          if (status === 401) dispatch(setSignedOut())
         }
       },
     }),

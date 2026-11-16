@@ -15,6 +15,10 @@ const authSlice = createSlice({
       state.accessToken = null
       state.status = 'signedOut'
     },
+    setRestoreFailed(state) {
+      state.accessToken = null
+      state.status = 'restoreFailed'
+    },
     setRestoring(state) {
       state.accessToken = null
       state.status = 'restoring'
@@ -22,5 +26,5 @@ const authSlice = createSlice({
   },
 })
 
-export const { setAccessToken, setSignedOut, setRestoring } = authSlice.actions
+export const { setAccessToken, setRestoreFailed, setSignedOut, setRestoring } = authSlice.actions
 export default authSlice.reducer

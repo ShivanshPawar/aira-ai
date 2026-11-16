@@ -1,9 +1,14 @@
 import { env } from "../../config/env.js";
 
-export const refreshCookieOptions = {
-	// Cross-site production cookies require HTTPS and SameSite=None for browser delivery.
+export const createRefreshCookieOptions = (nodeEnv, maxAge) => ({
 	httpOnly: true,
-	secure: env.NODE_ENV === "production",
-	sameSite: env.NODE_ENV === "production" ? "none" : "lax",
-	maxAge: env.REFRESH_TOKEN_MAX_AGE,
-};
+	secure: nodeEnv === "production",
+	sameSite: nodeEnv === "production" ? "none" : "lax",
+	partitioned: nodeEnv === "production",
+	maxAge,
+});
+
+export const refreshCookieOptions = createRefreshCookieOptions(
+	env.NODE_ENV,
+	env.REFRESH_TOKEN_MAX_AGE,
+);
