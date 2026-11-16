@@ -1,6 +1,55 @@
 import dotenv from "dotenv";
+import { URL } from "node:url";
 
 dotenv.config();
+
+export const normalizeClientOrigin = (value) => {
+	if (!value) return value;
+
+	const trimmed = value.trim();
+	const hasWrappingQuotes =
+		(trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+		(trimmed.startsWith("'") && trimmed.endsWith("'"));
+	const unquoted = hasWrappingQuotes ? trimmed.slice(1, -1).trim() : trimmed;
+
+	try {
+		const url = new URL(unquoted);
+		if (
+			(url.protocol === "http:" || url.protocol === "https:") &&
+			!url.username &&
+			!url.password &&
+			url.pathname === "/" &&
+			!url.search &&
+			!url.hash
+		) {
+			return url.origin;
+		}
+	} catch {
+		// Keep invalid input intact so validateEnv can report the configuration error.
+	}
+
+	return unquoted;
+};
+
+export const validateClientOrigin = (value) => {
+	try {
+		const clientUrl = new URL(value);
+		if (
+			(clientUrl.protocol !== "http:" && clientUrl.protocol !== "https:") ||
+			clientUrl.origin !== value ||
+			clientUrl.username ||
+			clientUrl.password
+		) {
+			throw new Error();
+		}
+	} catch {
+		throw new Error(
+			"CLIENT_URL must be a frontend origin such as https://aira-ai-dffa.onrender.com, without quotes or a path.",
+		);
+	}
+
+	return value;
+};
 
 const parseDuration = (value) => {
 	// Convert the human-readable token lifetime into milliseconds for cookie expiry.
@@ -28,7 +77,7 @@ export const env = {
 
 	MONGODB_URI: process.env.MONGODB_URI,
 
-	CLIENT_URL: process.env.CLIENT_URL,
+	CLIENT_URL: normalizeClientOrigin(process.env.CLIENT_URL),
 
 	JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
 	JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
@@ -72,6 +121,8 @@ export const validateEnv = () => {
 			`Missing required environment variables: ${missing.join(", ")}`,
 		);
 	}
+
+	validateClientOrigin(env.CLIENT_URL);
 
 	if (!env.REFRESH_TOKEN_MAX_AGE) {
 		throw new Error(
