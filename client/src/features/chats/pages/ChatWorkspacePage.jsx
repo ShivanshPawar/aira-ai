@@ -108,7 +108,7 @@ const ChatWorkspacePage = () => {
       <div className="mb-7 grid size-14 place-items-center border border-[#d8f36a]/30"><img alt="Aira AI" className="size-10 object-contain" src="/logo.png" /></div>
       <p className="mb-8 font-mono text-xs uppercase tracking-[0.2em] text-(--color-lime)">Your thinking space</p>
       <h1 className="max-w-2xl text-4xl font-semibold leading-tight text-[#f4f0e8] sm:text-5xl">
-        {chat ? chat.title : "Hey buddy, what's in your mind?"}
+        {chat ? chat.title : "Hey, what's in your mind?"}
       </h1>
       <p className="mt-4 max-w-md text-sm leading-6 text-[#92958c]">
         {chat ? 'Your conversation is ready. The message workspace is arriving in the next build iteration.' : 'Ask a question, follow a thought, or share a fresh idea.'}
