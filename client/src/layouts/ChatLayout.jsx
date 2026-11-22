@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Archive, Menu, MessageSquarePlus, PanelLeft, Search, Settings2, X } from 'lucide-react'
-import { Link, Outlet, useNavigate, useParams } from 'react-router-dom'
+import { Archive, Menu, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, Search, Settings2, X } from 'lucide-react'
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useSelector } from 'react-redux'
 import { useGetChatsQuery, useCreateChatMutation } from '../features/chats/chatsApi.js'
 import { useGetCurrentUserQuery } from '../features/auth/authApi.js'
@@ -13,6 +13,7 @@ const ChatLayout = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [page, setPage] = useState(1)
   const [sidebarExpanded, setSidebarExpanded] = useState(false)
+  const [mobileChatViewportHeight, setMobileChatViewportHeight] = useState(null)
   const searchInputRef = useRef(null)
   const { provider, model } = useSelector((state) => state.chatUi)
   const { data: user } = useGetCurrentUserQuery()
@@ -23,8 +24,36 @@ const ChatLayout = () => {
   const [actionError, setActionError] = useState('')
   const touchStartRef = useRef(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const chats = data?.items || []
   const sidebarCollapsed = !sidebarExpanded && !sidebarOpen
+  const isChatWorkspace = location.pathname === ROUTES.chats || /^\/chats\/(?!archived$)[^/]+$/.test(location.pathname)
+
+  useEffect(() => {
+    if (!isChatWorkspace) {
+      setMobileChatViewportHeight(null)
+      return
+    }
+
+    const mobileViewport = window.matchMedia('(max-width: 1023px)')
+    const viewport = window.visualViewport
+    const updateViewportHeight = () => {
+      setMobileChatViewportHeight(mobileViewport.matches
+        ? `${Math.round(viewport?.height || window.innerHeight)}px`
+        : null)
+    }
+
+    updateViewportHeight()
+    mobileViewport.addEventListener('change', updateViewportHeight)
+    viewport?.addEventListener('resize', updateViewportHeight)
+    window.addEventListener('resize', updateViewportHeight)
+
+    return () => {
+      mobileViewport.removeEventListener('change', updateViewportHeight)
+      viewport?.removeEventListener('resize', updateViewportHeight)
+      window.removeEventListener('resize', updateViewportHeight)
+    }
+  }, [isChatWorkspace])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -72,13 +101,16 @@ const ChatLayout = () => {
   }
 
   return (
-    <div className="flex h-dvh min-h-0 w-full overflow-hidden bg-[#111310]" onTouchEnd={handleDrawerSwipe} onTouchStart={trackDrawerSwipe}>
+    <div className={`flex h-dvh min-h-0 w-full overflow-hidden bg-[#111310] ${isChatWorkspace ? 'max-lg:fixed max-lg:inset-x-0 max-lg:top-0' : ''}`} onTouchEnd={handleDrawerSwipe} onTouchStart={trackDrawerSwipe} style={isChatWorkspace && mobileChatViewportHeight ? { height: mobileChatViewportHeight } : undefined}>
       {sidebarOpen && <button aria-label="Close navigation" className="fixed inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <aside className={`fixed inset-y-0 left-0 z-30 flex w-71.5 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#191b17] transition-transform lg:relative lg:inset-auto lg:z-auto lg:h-full lg:translate-x-0 lg:transition-[width] lg:duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'sidebar-compact' : 'sidebar-expanded'}`} onMouseEnter={() => setSidebarExpanded(true)}>
+      <aside className={`fixed inset-y-0 left-0 z-30 flex w-71.5 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#191b17] transition-transform lg:relative lg:inset-auto lg:z-auto lg:h-full lg:translate-x-0 lg:transition-[width] lg:duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'sidebar-compact' : 'sidebar-expanded'}`}>
         <div className={`flex h-18 min-h-18 shrink-0 items-center border-b border-white/10 ${sidebarCollapsed ? 'justify-center gap-0 px-1' : 'justify-between px-5'}`}>
-          {sidebarCollapsed ? <Link aria-label="Aira AI home" className="grid size-9 place-items-center" to={ROUTES.chats}><img alt="" aria-hidden="true" className="size-6 object-contain" src="/logo.png" /></Link> : <>
+          {sidebarCollapsed ? <div className="group relative grid size-9 place-items-center">
+            <Link aria-label="Aira AI home" className="grid size-9 place-items-center transition-opacity group-hover:opacity-0 group-focus-within:opacity-0" to={ROUTES.chats}><img alt="" aria-hidden="true" className="size-6 object-contain" src="/logo.png" /></Link>
+            <button aria-label="Expand sidebar" className="pointer-events-none absolute inset-0 m-auto grid size-8 place-items-center text-[#92958c] opacity-0 transition-colors group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-white/5 hover:text-[#f4f0e8] focus-visible:pointer-events-auto focus-visible:bg-white/5 focus-visible:opacity-100 focus-visible:text-[#f4f0e8]" onClick={() => setSidebarExpanded(true)} title="Expand sidebar" type="button"><PanelLeftOpen size={17} /></button>
+          </div> : <>
             <Link aria-label="Aira AI home" className="text-sm font-extrabold tracking-[0.16em]" to={ROUTES.chats}>AIRA AI</Link>
-            <button aria-label="Collapse sidebar" className="hidden size-8 shrink-0 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] lg:grid" onClick={() => setSidebarExpanded(false)} title="Collapse sidebar" type="button"><PanelLeft size={17} /></button>
+            <button aria-label="Collapse sidebar" className="hidden size-8 shrink-0 place-items-center text-[#92958c] hover:bg-white/5 hover:text-[#f4f0e8] lg:grid" onClick={() => setSidebarExpanded(false)} title="Collapse sidebar" type="button"><PanelLeftClose size={17} /></button>
           </>}
           <button aria-label="Close navigation" className="text-[#92958c] lg:hidden" onClick={() => setSidebarOpen(false)}><X size={18} /></button>
         </div>
