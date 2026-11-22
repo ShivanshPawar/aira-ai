@@ -125,14 +125,6 @@ const generateAssistantResponse = async (userId, chatId) => {
 
 		await chatService.incrementTokenUsage(chatId, aiResponse.usage);
 
-		const firstUserMessage = history.find(
-			(message) => message.role === MESSAGE_ROLES.USER,
-		);
-
-		if (firstUserMessage) {
-			await chatService.updateChatTitle(chatId, firstUserMessage.content);
-		}
-
 		triggerConversationSummary(chatId, aiOptions);
 
 		return assistantMessage;
@@ -169,6 +161,7 @@ const sendUserMessage = async (userId, chatId, content, attachments = []) => {
 			userMessage._id,
 			userMessage.createdAt,
 		);
+		await chatService.updateChatTitle(chatId, content);
 
 		const assistantMessage = await generateAssistantResponse(userId, chatId);
 
@@ -292,8 +285,6 @@ const generateAssistantStream = async (
 		onComplete = () => {},
 		onError = () => {},
 	} = callbacks;
-
-	const { contentForTitle = null } = options;
 
 	let assistantMessage = null;
 	let assistantText = "";
@@ -429,10 +420,6 @@ const generateAssistantStream = async (
 
 		triggerConversationSummary(chatId, aiOptions);
 
-		if (contentForTitle) {
-			await chatService.updateChatTitle(chatId, contentForTitle);
-		}
-
 		await onComplete({
 			assistantMessage,
 		});
@@ -522,6 +509,7 @@ const streamMessage = async (
 			userMessage._id,
 			userMessage.createdAt,
 		);
+		await chatService.updateChatTitle(chatId, content);
 
 		return generateAssistantStream(
 			userId,
@@ -536,9 +524,6 @@ const streamMessage = async (
 				},
 			},
 			signal,
-			{
-				contentForTitle: content,
-			},
 		);
 	});
 };
