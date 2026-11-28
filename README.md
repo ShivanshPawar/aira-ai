@@ -1,4 +1,4 @@
-# Aira AI
+# Aira AI | Multi-LLM Conversational Platform
 
 A full-stack conversational AI web application supporting multiple LLM providers, real-time SSE response streaming, context-window summarization, and multimodal file attachments.
 
